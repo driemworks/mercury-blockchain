@@ -1,0 +1,12 @@
+{
+    "manifest": {
+        "tony": {
+            "sent": [{"to": "theo", "CID": "QmKd09df88df9fusfgfg"}],
+            "received": []
+        },
+        "theo": {
+            "sent": [],
+            "received": [{"from": "tony", "CID": "QmKd09df88df9fusfgfg"}]
+        }
+    }   
+}
