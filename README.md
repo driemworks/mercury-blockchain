@@ -28,3 +28,4 @@ TODO:
 - Validate CID before adding to tx: https://github.com/ipfs/go-cid 
 - build encryption/decryption functionality (need to integrate with go-ethereum first)
 - determine best way to upload to IPFS
+- avoid sending duplicate files

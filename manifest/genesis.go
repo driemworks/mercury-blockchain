@@ -12,7 +12,8 @@ var genesisJson = `
     "manifest": {
         "tony": {
             "sent": [],
-            "inbox": []
+            "inbox": [],
+			"remainingTx": 100000
         }
     }
 }`

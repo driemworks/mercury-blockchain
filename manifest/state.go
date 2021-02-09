@@ -23,8 +23,9 @@ type InboxItem struct {
 }
 
 type Manifest struct {
-	Sent  []SentItem
-	Inbox []InboxItem
+	Sent        []SentItem  `json:"sent"`
+	Inbox       []InboxItem `json:"inbox"`
+	RemainingTx int         `json:"remainingTx"`
 }
 
 type State struct {
@@ -53,7 +54,7 @@ func NewStateFromDisk(datadir string) (*State, error) {
 	// using manifest as var and Manifest as type, but they are not the same thing
 	manifest := make(map[Account]Manifest)
 	for account, mailbox := range gen.Manifest {
-		manifest[account] = Manifest{mailbox.Sent, mailbox.Inbox}
+		manifest[account] = Manifest{mailbox.Sent, mailbox.Inbox, mailbox.RemainingTx}
 	}
 
 	blockDbFile, err := os.OpenFile(getBlocksDbFilePath(datadir), os.O_APPEND|os.O_RDWR, 0600)
@@ -158,6 +159,7 @@ func applyTx(tx Tx, s *State) error {
 	}
 	var senderDirectory = s.Manifest[tx.From]
 	senderDirectory.Sent = append(senderDirectory.Sent, SentItem{tx.To, tx.CID})
+	senderDirectory.RemainingTx--
 	s.Manifest[tx.From] = senderDirectory
 
 	var receiverDirectory = s.Manifest[tx.To]
