@@ -49,7 +49,6 @@ func NewPeerNode(ip string, port uint64, isBootstrap bool, connected bool) PeerN
 func (n *Node) Run() error {
 	ctx := context.Background()
 	state, err := manifest.NewStateFromDisk(n.datadir)
-	fmt.Println(state.LatestBlock().Header.Number)
 	if err != nil {
 		return err
 	}

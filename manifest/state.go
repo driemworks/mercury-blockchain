@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+
+	goCid "github.com/ipfs/go-cid"
 )
 
 type CID string
@@ -143,6 +145,13 @@ func (s *State) NextBlockNumber() uint64 {
 * 2) appends an inbox item to t he tx's to account
  */
 func applyTx(tx Tx, s *State) error {
+	// verify  the tx contains a valid CID
+	_, err := goCid.Decode(fmt.Sprintf("%s", tx.CID))
+	if err != nil {
+		fmt.Println("Not a valid CID")
+		return err
+	}
+
 	// if it is a reward, just.. do nothing for now..
 	if tx.IsReward() {
 		return nil
