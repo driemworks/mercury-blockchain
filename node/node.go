@@ -1,49 +1,63 @@
 package node
 
 import (
+	"context"
 	"driemcoin/main/manifest"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 )
 
-const httpPort = 8080
+// const httpPort = 8080
 
-type ErrorResponse struct {
-	Error string `json:"error"`
+type PeerNode struct {
+	IP          string `json:"ip"`
+	Port        uint64 `json:"port"`
+	IsBootstrap bool   `json:"is_bootstrap"`
+	connected   bool
 }
 
-type ManifestResponse struct {
-	Hash     manifest.Hash                          `json:"hash"`
-	Manifest map[manifest.Account]manifest.Manifest `json:"manifest"`
+func (p PeerNode) TcpAddress() string {
+	return fmt.Sprintf("%s:%d", p.IP, p.Port)
 }
 
-type CidAddRequest struct {
-	From string `json:"from"`
-	To   string `json:"to"`
-	Cid  string `json:"cid"`
+type Node struct {
+	datadir    string
+	ip         string
+	port       uint64
+	state      *manifest.State
+	knownPeers map[string]PeerNode
 }
 
-type CidAddResponse struct {
-	Hash manifest.Hash `json:block_hash`
+func NewNode(datadir string, ip string, port uint64, boostrap PeerNode) *Node {
+	knownPeers := make(map[string]PeerNode)
+	knownPeers[boostrap.TcpAddress()] = boostrap
+	return &Node{
+		datadir:    datadir,
+		ip:         ip,
+		port:       port,
+		knownPeers: knownPeers,
+	}
 }
 
-type StatusResponse struct {
-	Hash   manifest.Hash `json:"block_hash"`
-	Number uint64        `json:"block_number"`
+func NewPeerNode(ip string, port uint64, isBootstrap bool, connected bool) PeerNode {
+	return PeerNode{ip, port, isBootstrap, connected}
 }
 
 /**
 * Start the node's HTTP client
  */
-func Run(datadir string) error {
-	fmt.Println(fmt.Sprintf("Starting node HTTP client on port %d", httpPort))
-	state, err := manifest.NewStateFromDisk(datadir)
+func (n *Node) Run() error {
+	ctx := context.Background()
+	state, err := manifest.NewStateFromDisk(n.datadir)
+	fmt.Println(state.LatestBlock().Header.Number)
 	if err != nil {
 		return err
 	}
 	defer state.Close()
+	n.state = state
+
+	go n.sync(ctx)
+
 	// list manifest
 	http.HandleFunc("/manifest/list", func(w http.ResponseWriter, r *http.Request) {
 		listManifestHandler(w, r, state)
@@ -53,89 +67,36 @@ func Run(datadir string) error {
 		addCIDHandler(w, r, state)
 	})
 	// get the nodes' status
-	// http.HandleFunc("/node/status", func(w http.ResponseWriter, r *http.Request)) {
+	http.HandleFunc("/node/status", func(w http.ResponseWriter, r *http.Request) {
+		nodeStatusHandler(w, r, state)
+	})
+	/* sync endpoints */
+	// peer sync
+	http.HandleFunc("/node/sync", func(w http.ResponseWriter, r *http.Request) {
+		syncHandler(w, r, n)
+	})
+	// block sync
+	http.HandleFunc("/node/peer", func(w http.ResponseWriter, r *http.Request) {
+		addPeerHandler(w, r, n)
+	})
 
-	// }
-	return http.ListenAndServe(fmt.Sprintf(":%d", httpPort), nil)
+	return http.ListenAndServe(fmt.Sprintf(":%d", n.port), nil)
 }
 
-// func nodeStatusHandler(w http.ResponseWriter, r *http.Request, state *manifest.State) {
-// 	res := StatusResponse{
-// 		Hash: state.LatestBlockHash(),
-// 		Number: state.LatestBlock().Header.Number,
-// 	}
-// }
-
-/**
-* List the manifest
- */
-func listManifestHandler(w http.ResponseWriter, r *http.Request, state *manifest.State) {
-	writeRes(w, ManifestResponse{state.LatestBlockHash(), state.Manifest})
+func (n *Node) AddPeer(peer PeerNode) {
+	n.knownPeers[peer.TcpAddress()] = peer
 }
 
-/**
-*
- */
-func addCIDHandler(w http.ResponseWriter, r *http.Request, state *manifest.State) {
-	req := CidAddRequest{}
-	err := readRequest(r, &req)
-	if err != nil {
-		writeErrRes(w, err)
-		return
-	}
-	// TODO - consider renaming this function
-	cidTx := manifest.NewTx(manifest.NewAccount(req.From),
-		manifest.NewAccount(req.To), manifest.NewCID(req.Cid), "")
-	err = state.AddTx(cidTx)
-	if err != nil {
-		writeErrRes(w, err)
-		return
-	}
-	hash, err := state.Persist()
-	if err != nil {
-		writeErrRes(w, err)
-		return
-	}
-	writeRes(w, CidAddResponse{hash})
+func (n *Node) RemovePeer(peer PeerNode) {
+	delete(n.knownPeers, peer.TcpAddress())
 }
 
-/**
-*
- */
-func readRequest(r *http.Request, reqBody interface{}) error {
-	reqBodyJson, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return fmt.Errorf("Unable to umarshal request body %s", err.Error())
-	}
-	defer r.Body.Close()
-	err = json.Unmarshal(reqBodyJson, reqBody)
-	if err != nil {
-		return fmt.Errorf("Unable to umarshal request body %s", err.Error())
-	}
-	return nil
-}
-
-/**
-*
- */
-func writeErrRes(w http.ResponseWriter, err error) {
-	jsonErrRes, _ := json.Marshal(ErrorResponse{err.Error()})
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusInternalServerError)
-	w.Write(jsonErrRes)
-}
-
-/**
-*
- */
-func writeRes(w http.ResponseWriter, content interface{}) {
-	contentJson, err := json.Marshal(content)
-	if err != nil {
-		writeErrRes(w, err)
-		return
+func (n *Node) IsKnownPeer(peer PeerNode) bool {
+	if peer.IP == n.ip && peer.Port == n.port {
+		return true
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(contentJson)
+	_, isKnownPeer := n.knownPeers[peer.TcpAddress()]
+
+	return isKnownPeer
 }

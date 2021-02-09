@@ -1,6 +1,7 @@
 package main
 
 import (
+	"driemcoin/main/manifest"
 	"fmt"
 	"os"
 
@@ -8,6 +9,8 @@ import (
 )
 
 const flagDataDir = "datadir"
+const flagIP = "ip"
+const flagPort = "port"
 
 func main() {
 	var ftp2pCmd = &cobra.Command{
@@ -25,6 +28,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func getDataDirFromCmd(cmd *cobra.Command) string {
+	dataDir, _ := cmd.Flags().GetString(flagDataDir)
+	return manifest.ExpandPath(dataDir)
 }
 
 func addDefaultRequiredFlags(cmd *cobra.Command) {

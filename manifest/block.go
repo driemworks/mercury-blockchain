@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -17,6 +18,15 @@ func (h *Hash) UnmarshalText(data []byte) error {
 	return err
 }
 
+func (h Hash) Hex() string {
+	return hex.EncodeToString(h[:])
+}
+
+func (h Hash) IsEmpty() bool {
+	emptyHash := Hash{}
+	return bytes.Equal(emptyHash[:], h[:])
+}
+
 type Block struct {
 	Header BlockHeader
 	TXs    []Tx
@@ -25,6 +35,7 @@ type Block struct {
 type BlockHeader struct {
 	Parent Hash   `json:"parent"`
 	Time   uint64 `json:"time"`
+	Number uint64 `json:"number"`
 }
 
 type BlockFS struct {
@@ -44,6 +55,6 @@ func (b *Block) Hash() (Hash, error) {
 	return sha256.Sum256(txJson), nil
 }
 
-func NewBlock(parent Hash, time uint64, txs []Tx) Block {
-	return Block{BlockHeader{parent, time}, txs}
+func NewBlock(parent Hash, time uint64, number uint64, txs []Tx) Block {
+	return Block{BlockHeader{parent, time, number}, txs}
 }

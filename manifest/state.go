@@ -3,8 +3,9 @@ package manifest
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"os"
-	"time"
+	"reflect"
 )
 
 type CID string
@@ -27,8 +28,10 @@ type Manifest struct {
 type State struct {
 	Manifest        map[Account]Manifest
 	txMempool       []Tx
+	latestBlock     Block
 	latestBlockHash Hash
 	dbFile          *os.File
+	hasGenesisBlock bool
 }
 
 /*
@@ -44,54 +47,94 @@ func NewStateFromDisk(datadir string) (*State, error) {
 	if err != nil {
 		return nil, err
 	}
-	// load the manifest -> consider refactoring..
+	// load the manifest -> consider refactoring name..
 	// using manifest as var and Manifest as type, but they are not the same thing
 	manifest := make(map[Account]Manifest)
 	for account, mailbox := range gen.Manifest {
 		manifest[account] = Manifest{mailbox.Sent, mailbox.Inbox}
 	}
-	txFile, err := os.OpenFile(getBlocksDbFilePath(datadir), os.O_APPEND|os.O_RDWR, 0600)
+
+	blockDbFile, err := os.OpenFile(getBlocksDbFilePath(datadir), os.O_APPEND|os.O_RDWR, 0600)
 	if err != nil {
 		return nil, err
 	}
-	// read lines in tx.db
-	scanner := bufio.NewScanner(txFile)
-	// load initial state
-	state := &State{manifest, make([]Tx, 0), Hash{}, txFile}
+	scanner := bufio.NewScanner(blockDbFile)
+	state := &State{manifest, make([]Tx, 0), Block{}, Hash{}, blockDbFile, false}
 	for scanner.Scan() {
 		// handle scanner error
 		if err := scanner.Err(); err != nil {
 			return nil, err
 		}
+		blockFsJSON := scanner.Bytes()
+		if len(blockFsJSON) == 0 {
+			break
+		}
 		var blockFs BlockFS
-		if err := json.Unmarshal(scanner.Bytes(), &blockFs); err != nil {
+		if err := json.Unmarshal(blockFsJSON, &blockFs); err != nil {
 			return nil, err
 		}
-		if err = state.applyBlock(blockFs.Value); err != nil {
+		if err = applyTXs(blockFs.Value.TXs, state); err != nil {
 			return nil, err
 		}
+		state.latestBlock = blockFs.Value
 		state.latestBlockHash = blockFs.Key
+		state.hasGenesisBlock = true
 	}
 	return state, nil
 }
 
-func (s *State) applyBlock(b Block) error {
-	for _, tx := range b.TXs {
-		if err := s.apply(tx); err != nil {
+func (s *State) AddBlocks(blocks []Block) error {
+	for _, b := range blocks {
+		_, err := s.AddBlock(b)
+		if err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
-func (s *State) AddBlock(b Block) error {
-	for _, tx := range b.TXs {
-		if err := s.AddTx(tx); err != nil {
-			return err
-		}
+func (s *State) AddBlock(b Block) (Hash, error) {
+	pendingState := s.copy()
+
+	err := applyBlock(b, pendingState)
+	if err != nil {
+		return Hash{}, err
 	}
 
-	return nil
+	blockHash, err := b.Hash()
+	if err != nil {
+		return Hash{}, err
+	}
+
+	blockFs := BlockFS{blockHash, b}
+
+	blockFsJson, err := json.Marshal(blockFs)
+	if err != nil {
+		return Hash{}, err
+	}
+
+	fmt.Printf("Persisting new Block to disk:\n")
+	fmt.Printf("\t%s\n", blockFsJson)
+
+	_, err = s.dbFile.Write(append(blockFsJson, '\n'))
+	if err != nil {
+		return Hash{}, err
+	}
+
+	s.Manifest = pendingState.Manifest
+	s.latestBlockHash = blockHash
+	s.latestBlock = b
+	s.hasGenesisBlock = true
+
+	return blockHash, nil
+}
+
+func (s *State) NextBlockNumber() uint64 {
+	if !s.hasGenesisBlock {
+		return uint64(0)
+	}
+	return s.LatestBlock().Header.Number + 1
 }
 
 /*
@@ -99,15 +142,11 @@ func (s *State) AddBlock(b Block) error {
 * 1) appends a sent item to the tx's from account
 * 2) appends an inbox item to t he tx's to account
  */
-func (s *State) apply(tx Tx) error {
+func applyTx(tx Tx, s *State) error {
 	// if it is a reward, just.. do nothing for now..
 	if tx.IsReward() {
 		return nil
 	}
-	// since there is no concept of a reward, coin, etc yet,
-	// just add a fake CID for now
-	// does not account for anything that could be happening as to the
-	// sender receiving cid's
 	var senderDirectory = s.Manifest[tx.From]
 	senderDirectory.Sent = append(senderDirectory.Sent, SentItem{tx.To, tx.CID})
 	s.Manifest[tx.From] = senderDirectory
@@ -119,46 +158,39 @@ func (s *State) apply(tx Tx) error {
 	return nil
 }
 
-/*
-* Add the transaction to the state
-* 1) update tx sender/receiver state by calling apply
-* 2) append tx to txMempool (to be mined later)
- */
-func (s *State) AddTx(tx Tx) error {
-	// try to apply the tx to the state
-	if err := s.apply(tx); err != nil {
-		return err
-	}
-	// append to the tx mempool (to be mined later)
-	s.txMempool = append(s.txMempool, tx)
-	return nil
-}
-
 func NewCID(cid string) CID {
 	return CID(cid)
 }
 
-/*
-* Persist the state's tx mempool to tx.db
- */
-func (s *State) Persist() (Hash, error) {
-	block := NewBlock(s.latestBlockHash, uint64(time.Now().Unix()), s.txMempool)
-	blockHash, err := block.Hash()
-	if err != nil {
-		return Hash{}, err
+// applyBlock verifies if block can be added to the blockchain.
+//
+// Block metadata are verified as well as transactions within (sufficient balances, etc).
+func applyBlock(b Block, s State) error {
+	nextExpectedBlockNumber := s.latestBlock.Header.Number + 1
+
+	if s.hasGenesisBlock && b.Header.Number != nextExpectedBlockNumber {
+		return fmt.Errorf("next expected block must be '%d' not '%d'", nextExpectedBlockNumber, b.Header.Number)
 	}
 
-	blockFs := BlockFS{blockHash, block}
-	blockFsJson, err := json.Marshal(blockFs)
-	if err != nil {
-		return Hash{}, err
+	if s.hasGenesisBlock && s.latestBlock.Header.Number > 0 && !reflect.DeepEqual(b.Header.Parent, s.latestBlockHash) {
+		return fmt.Errorf("next block parent hash must be '%x' not '%x'", s.latestBlockHash, b.Header.Parent)
 	}
-	if _, err = s.dbFile.Write(append(blockFsJson, '\n')); err != nil {
-		return Hash{}, err
+
+	return applyTXs(b.TXs, &s)
+}
+
+/**
+*
+ */
+func applyTXs(txs []Tx, s *State) error {
+	for _, tx := range txs {
+		err := applyTx(tx, s)
+		if err != nil {
+			return err
+		}
 	}
-	s.latestBlockHash = blockHash
-	s.txMempool = []Tx{}
-	return s.latestBlockHash, nil
+
+	return nil
 }
 
 /*
@@ -173,4 +205,65 @@ func (s *State) Close() {
  */
 func (s *State) LatestBlockHash() Hash {
 	return s.latestBlockHash
+}
+
+func (s *State) LatestBlock() Block {
+	return s.latestBlock
+}
+
+func (s *State) copy() State {
+	copy := State{}
+	copy.hasGenesisBlock = s.hasGenesisBlock
+	copy.dbFile = s.dbFile
+	copy.latestBlock = s.latestBlock
+	copy.latestBlockHash = s.latestBlockHash
+	copy.txMempool = make([]Tx, len(s.txMempool))
+	copy.Manifest = make(map[Account]Manifest)
+	// deep copy transactions
+	for _, tx := range s.txMempool {
+		copy.txMempool = append(copy.txMempool, tx)
+	}
+	// deep copy manifest
+	for account, manifest := range s.Manifest {
+		copy.Manifest[account] = manifest
+	}
+	return copy
+}
+
+func GetBlocksAfter(blockHash Hash, dataDir string) ([]Block, error) {
+	f, err := os.OpenFile(getBlocksDbFilePath(dataDir), os.O_RDONLY, 0600)
+	if err != nil {
+		return nil, err
+	}
+
+	blocks := make([]Block, 0)
+	shouldStartCollecting := false
+
+	if reflect.DeepEqual(blockHash, Hash{}) {
+		shouldStartCollecting = true
+	}
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		if err := scanner.Err(); err != nil {
+			return nil, err
+		}
+
+		var blockFs BlockFS
+		err = json.Unmarshal(scanner.Bytes(), &blockFs)
+		if err != nil {
+			return nil, err
+		}
+
+		if shouldStartCollecting {
+			blocks = append(blocks, blockFs.Value)
+			continue
+		}
+
+		if blockHash == blockFs.Key {
+			shouldStartCollecting = true
+		}
+	}
+
+	return blocks, nil
 }
