@@ -1,25 +1,23 @@
 # FTP2P
 
-FTP2P is a blockchain to facilitate sharing of data via IPFS.
+File Transfer: Peer-to-Peer is a blockchain to facilitate sharing of data via IPFS.
 
 ### Installation
 - navigate to main and run `go install ./cli/...`
 
-### Usage
-- List the version
-```
-ftp2p version
-```
+## Usage
+### CLI commands
+`ftp2p [command] [options]`
+- Available Commands:
+  - help: Help about any command
+  - run:  Run the ftp2p node
+    -  options:
+      - --datadir (required): the directory where local data will be stored (ex: blockchain transactions)
+      - --ip: the ip addreses of the ftp2p node
+      - -- port: the port of the ftp2p node
+  - version: Display the current CLI version
 
-- Share CID with someone
-```
-ftp2p send --from="<name1>" --to="<name2>" --cid="Qmadfj83f3..."
-```
-
-- List the manifest
-```
-ftp2p manifest list
-```
+### API
 
 ### Local Setup
 
@@ -29,3 +27,14 @@ TODO:
 - build encryption/decryption functionality (need to integrate with go-ethereum first)
 - determine best way to upload to IPFS
 - avoid sending duplicate files
+
+### Testing
+- ex: $ go test ./node/ -test.v -test.run ^TestValidBlockHash$
+
+### Just some thoughts...
+- by default there is duplicate transaction (i.e. duplicate file upload) protection!
+- PoW is too slow... consider replacing
+
+
+## Acknowledgements
+- This repository is heavily influenced by this repo and the associated ebook https://github.com/web3coach/the-blockchain-bar

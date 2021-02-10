@@ -7,8 +7,8 @@ import (
 )
 
 const Major = "0"
-const Minor = "0"
-const Patch = "6"
+const Minor = "1"
+const Patch = "2"
 
 var versionCmd = &cobra.Command{
 	Use:   "version",

@@ -7,29 +7,31 @@ import (
 	"os"
 	"reflect"
 
-	goCid "github.com/ipfs/go-cid"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 type CID string
 
 type SentItem struct {
-	To  Account `json:"to"`
-	CID CID     `json:"cid"`
+	To  common.Address `json:"to"`
+	CID CID            `json:"cid"`
 }
 
 type InboxItem struct {
-	From Account `json:"from"`
-	CID  CID     `json:"cid"`
+	From common.Address `json:"from"`
+	CID  CID            `json:"cid"`
 }
 
 type Manifest struct {
-	Sent        []SentItem  `json:"sent"`
-	Inbox       []InboxItem `json:"inbox"`
-	RemainingTx int         `json:"remainingTx"`
+	Sent           []SentItem  `json:"sent"`
+	Inbox          []InboxItem `json:"inbox"`
+	Balance        float32     `json:"balance"`
+	PendingBalance float32     `json:"pending_balance"`
 }
 
 type State struct {
-	Manifest        map[Account]Manifest
+	Manifest        map[common.Address]Manifest
+	Account2Nonce   map[common.Address]uint
 	txMempool       []Tx
 	latestBlock     Block
 	latestBlockHash Hash
@@ -52,9 +54,9 @@ func NewStateFromDisk(datadir string) (*State, error) {
 	}
 	// load the manifest -> consider refactoring name..
 	// using manifest as var and Manifest as type, but they are not the same thing
-	manifest := make(map[Account]Manifest)
+	manifest := make(map[common.Address]Manifest)
 	for account, mailbox := range gen.Manifest {
-		manifest[account] = Manifest{mailbox.Sent, mailbox.Inbox, mailbox.RemainingTx}
+		manifest[account] = Manifest{mailbox.Sent, mailbox.Inbox, mailbox.Balance, mailbox.PendingBalance}
 	}
 
 	blockDbFile, err := os.OpenFile(getBlocksDbFilePath(datadir), os.O_APPEND|os.O_RDWR, 0600)
@@ -62,7 +64,8 @@ func NewStateFromDisk(datadir string) (*State, error) {
 		return nil, err
 	}
 	scanner := bufio.NewScanner(blockDbFile)
-	state := &State{manifest, make([]Tx, 0), Block{}, Hash{}, blockDbFile, false}
+	account2Nonce := make(map[common.Address]uint)
+	state := &State{manifest, account2Nonce, make([]Tx, 0), Block{}, Hash{}, blockDbFile, false}
 	for scanner.Scan() {
 		// handle scanner error
 		if err := scanner.Err(); err != nil {
@@ -110,6 +113,10 @@ func (s *State) AddBlock(b Block) (Hash, error) {
 		return Hash{}, err
 	}
 
+	if !IsBlockHashValid(blockHash) {
+		return Hash{}, fmt.Errorf("invalid block hash %x", blockHash)
+	}
+
 	blockFs := BlockFS{blockHash, b}
 
 	blockFsJson, err := json.Marshal(blockFs)
@@ -140,26 +147,23 @@ func (s *State) NextBlockNumber() uint64 {
 	return s.LatestBlock().Header.Number + 1
 }
 
+func (s *State) GetNextAccountNonce(account common.Address) uint {
+	return s.Account2Nonce[account] + 1
+}
+
 /*
 * apply the transaction to the current state
 * 1) appends a sent item to the tx's from account
 * 2) appends an inbox item to t he tx's to account
  */
-func applyTx(tx Tx, s *State) error {
-	// verify  the tx contains a valid CID
-	_, err := goCid.Decode(fmt.Sprintf("%s", tx.CID))
-	if err != nil {
-		fmt.Println("Not a valid CID")
-		return err
-	}
-
+func applyTx(tx SignedTx, s *State) error {
 	// if it is a reward, just.. do nothing for now..
 	if tx.IsReward() {
 		return nil
 	}
 	var senderDirectory = s.Manifest[tx.From]
 	senderDirectory.Sent = append(senderDirectory.Sent, SentItem{tx.To, tx.CID})
-	senderDirectory.RemainingTx--
+	senderDirectory.Balance--
 	s.Manifest[tx.From] = senderDirectory
 
 	var receiverDirectory = s.Manifest[tx.To]
@@ -193,7 +197,7 @@ func applyBlock(b Block, s State) error {
 /**
 *
  */
-func applyTXs(txs []Tx, s *State) error {
+func applyTXs(txs []SignedTx, s *State) error {
 	for _, tx := range txs {
 		err := applyTx(tx, s)
 		if err != nil {
@@ -229,7 +233,7 @@ func (s *State) copy() State {
 	copy.latestBlock = s.latestBlock
 	copy.latestBlockHash = s.latestBlockHash
 	copy.txMempool = make([]Tx, len(s.txMempool))
-	copy.Manifest = make(map[Account]Manifest)
+	copy.Manifest = make(map[common.Address]Manifest)
 	// deep copy transactions
 	for _, tx := range s.txMempool {
 		copy.txMempool = append(copy.txMempool, tx)

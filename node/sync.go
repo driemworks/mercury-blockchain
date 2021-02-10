@@ -8,6 +8,16 @@ import (
 	"time"
 )
 
+const endpointStatus = "/node/status"
+
+const endpointSync = "/node/sync"
+const endpointSyncQueryKeyFromBlock = "fromBlock"
+
+const endpointAddPeer = "/node/peer"
+const endpointAddPeerQueryKeyIP = "ip"
+const endpointAddPeerQueryKeyPort = "port"
+const endpointAddPeerQueryKeyMiner = "miner"
+
 func (n *Node) sync(ctx context.Context) error {
 	ticker := time.NewTicker(45 * time.Second)
 
@@ -24,7 +34,7 @@ func (n *Node) sync(ctx context.Context) error {
 
 func (n *Node) doSync() {
 	for _, peer := range n.knownPeers {
-		if n.ip == peer.IP && n.port == peer.Port {
+		if n.info.IP == peer.IP && n.info.Port == peer.Port {
 			continue
 		}
 
@@ -52,7 +62,13 @@ func (n *Node) doSync() {
 			continue
 		}
 
-		err = n.syncKnownPeers(peer, status)
+		err = n.syncKnownPeers(status)
+		if err != nil {
+			fmt.Printf("ERROR: %s\n", err)
+			continue
+		}
+
+		err = n.syncPendingTXs(peer, status.PendingTxs)
 		if err != nil {
 			fmt.Printf("ERROR: %s\n", err)
 			continue
@@ -62,6 +78,7 @@ func (n *Node) doSync() {
 
 func (n *Node) syncBlocks(peer PeerNode, status StatusResponse) error {
 	localBlockNumber := n.state.LatestBlock().Header.Number
+
 	// If the peer has no blocks, ignore it
 	if status.Hash.IsEmpty() {
 		return nil
@@ -89,15 +106,36 @@ func (n *Node) syncBlocks(peer PeerNode, status StatusResponse) error {
 		return err
 	}
 
-	return n.state.AddBlocks(blocks)
+	for _, block := range blocks {
+		_, err = n.state.AddBlock(block)
+		if err != nil {
+			return err
+		}
+
+		n.newSyncedBlocks <- block
+	}
+
+	return nil
 }
 
-func (n *Node) syncKnownPeers(peer PeerNode, status StatusResponse) error {
-	for _, statusPeer := range status.knownPeers {
+func (n *Node) syncKnownPeers(status StatusResponse) error {
+	for _, statusPeer := range status.KnownPeers {
 		if !n.IsKnownPeer(statusPeer) {
 			fmt.Printf("Found new Peer %s\n", statusPeer.TcpAddress())
 
 			n.AddPeer(statusPeer)
+		}
+	}
+
+	return nil
+}
+
+func (n *Node) syncPendingTXs(peer PeerNode, txs []manifest.SignedTx) error {
+	fmt.Println("Syncing pending transactions")
+	for _, tx := range txs {
+		err := n.AddPendingTX(tx, peer)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -112,11 +150,11 @@ func (n *Node) joinKnownPeers(peer PeerNode) error {
 	url := fmt.Sprintf(
 		"http://%s%s?%s=%s&%s=%d",
 		peer.TcpAddress(),
-		"/node/peer",
-		"ip",
-		n.ip,
-		"port",
-		n.port,
+		endpointAddPeer,
+		endpointAddPeerQueryKeyIP,
+		n.info.IP,
+		endpointAddPeerQueryKeyPort,
+		n.info.Port,
 	)
 
 	res, err := http.Get(url)
@@ -146,19 +184,19 @@ func (n *Node) joinKnownPeers(peer PeerNode) error {
 }
 
 func queryPeerStatus(peer PeerNode) (StatusResponse, error) {
-	url := fmt.Sprintf("http://%s%s", peer.TcpAddress(), "/node/status")
+	url := fmt.Sprintf("http://%s%s", peer.TcpAddress(), endpointStatus)
 	res, err := http.Get(url)
 	if err != nil {
 		return StatusResponse{}, err
 	}
 
-	statusRes := StatusResponse{}
-	err = readRes(res, &statusRes)
+	StatusResponse := StatusResponse{}
+	err = readRes(res, &StatusResponse)
 	if err != nil {
-		return StatusResponse{}, err
+		return StatusResponse, err
 	}
 
-	return statusRes, nil
+	return StatusResponse, nil
 }
 
 func fetchBlocksFromPeer(peer PeerNode, fromBlock manifest.Hash) ([]manifest.Block, error) {
@@ -167,8 +205,8 @@ func fetchBlocksFromPeer(peer PeerNode, fromBlock manifest.Hash) ([]manifest.Blo
 	url := fmt.Sprintf(
 		"http://%s%s?%s=%s",
 		peer.TcpAddress(),
-		"/node/sync",
-		"fromBlock",
+		endpointSync,
+		endpointSyncQueryKeyFromBlock,
 		fromBlock.Hex(),
 	)
 

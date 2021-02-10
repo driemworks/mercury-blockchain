@@ -2,10 +2,13 @@ package node
 
 import (
 	"driemcoin/main/manifest"
+	"driemcoin/main/wallet"
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+	goCid "github.com/ipfs/go-cid"
 )
 
 type SyncRes struct {
@@ -22,24 +25,27 @@ type ErrorResponse struct {
 }
 
 type ManifestResponse struct {
-	Hash     manifest.Hash                          `json:"hash"`
-	Manifest map[manifest.Account]manifest.Manifest `json:"manifest"`
+	Hash     manifest.Hash                        `json:"hash"`
+	Manifest map[common.Address]manifest.Manifest `json:"manifest"`
 }
 
 type CidAddRequest struct {
-	From string `json:"from"`
-	To   string `json:"to"`
-	Cid  string `json:"cid"`
+	From    string `json:"from"`
+	To      string `json:"to"`
+	Cid     string `json:"cid"`
+	FromPwd string `json:"from_pwd"`
 }
 
 type CidAddResponse struct {
-	Hash manifest.Hash `json:block_hash`
+	Success bool `json:"success"`
 }
 
 type StatusResponse struct {
-	Hash       manifest.Hash `json:"block_hash"`
-	Number     uint64        `json:"block_number"`
-	knownPeers []PeerNode    `json:"known_peers`
+	Hash       manifest.Hash       `json:"block_hash"`
+	Number     uint64              `json:"block_number"`
+	Alias      string              `json:"alias"`
+	KnownPeers map[string]PeerNode `json:"known_peers"`
+	PendingTxs []manifest.SignedTx `json:"pending_txs"`
 }
 
 /**
@@ -52,33 +58,60 @@ func listManifestHandler(w http.ResponseWriter, r *http.Request, state *manifest
 /**
 *
  */
-func addCIDHandler(w http.ResponseWriter, r *http.Request, state *manifest.State) {
+func addCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	req := CidAddRequest{}
-	err := readRequest(r, &req)
+	err := readReq(r, &req)
 	if err != nil {
 		writeErrRes(w, err)
 		return
 	}
-	cidTx := manifest.NewTx(manifest.NewAccount(req.From),
-		manifest.NewAccount(req.To), manifest.NewCID(req.Cid), "")
-	next := state.NextBlockNumber()
-	block := manifest.NewBlock(state.LatestBlockHash(), uint64(time.Now().Unix()),
-		next, []manifest.Tx{cidTx})
-	hash, err := state.AddBlock(block)
+
+	from := manifest.NewAddress(req.From)
+	// validations to make sure the sender/receiver are valid addresses
+	if from.String() == common.HexToAddress("").String() {
+		writeErrRes(w, fmt.Errorf("%s is an invalid 'from' sender", from.String()))
+		return
+	}
+	// validations to make sure the CID is valid
+	if req.FromPwd == "" {
+		writeErrRes(w, fmt.Errorf("password to decrypt the %s address is required. 'from_pwd' is empty", from.String()))
+		return
+	}
+
+	// verify  the tx contains a valid CID
+	_, err = goCid.Decode(fmt.Sprintf("%s", req.Cid))
 	if err != nil {
 		writeErrRes(w, err)
 		return
 	}
-	writeRes(w, CidAddResponse{hash})
+
+	nonce := node.state.GetNextAccountNonce(from)
+	tx := manifest.NewTx(manifest.NewAddress(req.From),
+		manifest.NewAddress(req.To), manifest.NewCID(req.Cid), nonce, "")
+	signedTx, err := wallet.SignTxWithKeystoreAccount(tx, from, req.FromPwd, wallet.GetKeystoreDirPath(node.datadir))
+	if err != nil {
+		writeErrRes(w, err)
+		return
+	}
+	err = node.AddPendingTX(signedTx, node.info)
+	if err != nil {
+		writeErrRes(w, err)
+		return
+	}
+	writeRes(w, CidAddResponse{Success: true})
+
 }
 
 /**
 *
  */
-func nodeStatusHandler(w http.ResponseWriter, r *http.Request, state *manifest.State) {
+func nodeStatusHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	res := StatusResponse{
-		Hash:   state.LatestBlockHash(),
-		Number: state.LatestBlock().Header.Number,
+		Hash:       node.state.LatestBlockHash(),
+		Number:     node.state.LatestBlock().Header.Number,
+		Alias:      node.alias,
+		KnownPeers: node.knownPeers,
+		PendingTxs: node.getPendingTXsAsArray(),
 	}
 	writeRes(w, res)
 }
@@ -111,18 +144,15 @@ func syncHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 func addPeerHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	peerIP := r.URL.Query().Get("ip")
 	peerPortRaw := r.URL.Query().Get("port")
+	minerRaw := r.URL.Query().Get("miner")
 
 	peerPort, err := strconv.ParseUint(peerPortRaw, 10, 32)
 	if err != nil {
 		writeRes(w, AddPeerRes{false, err.Error()})
 		return
 	}
-
-	peer := NewPeerNode(peerIP, peerPort, false, true)
-
+	peer := NewPeerNode(peerIP, peerPort, false, manifest.NewAddress(minerRaw), true)
 	node.AddPeer(peer)
-
 	fmt.Printf("Peer '%s' was added into KnownPeers\n", peer.TcpAddress())
-
 	writeRes(w, AddPeerRes{true, ""})
 }

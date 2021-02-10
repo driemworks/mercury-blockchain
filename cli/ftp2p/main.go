@@ -11,6 +11,9 @@ import (
 const flagDataDir = "datadir"
 const flagIP = "ip"
 const flagPort = "port"
+const flagMiner = "miner"
+const flagAlias = "alias"
+const flagKeystoreFile = "keystore"
 
 func main() {
 	var ftp2pCmd = &cobra.Command{
@@ -22,12 +25,18 @@ func main() {
 	// TODO these need to be standardized...
 	ftp2pCmd.AddCommand(versionCmd)
 	ftp2pCmd.AddCommand(runCmd())
+	ftp2pCmd.AddCommand(walletCmd())
 
 	err := ftp2pCmd.Execute()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func addKeystoreFlag(cmd *cobra.Command) {
+	cmd.Flags().String(flagKeystoreFile, "", "Absolute path to the encrypted keystore file")
+	cmd.MarkFlagRequired(flagKeystoreFile)
 }
 
 func getDataDirFromCmd(cmd *cobra.Command) string {

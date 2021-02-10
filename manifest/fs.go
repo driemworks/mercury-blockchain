@@ -6,6 +6,7 @@ import (
 	"os/user"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -85,4 +86,14 @@ func homeDir() string {
 		return usr.HomeDir
 	}
 	return ""
+}
+
+func Unicode(s string) string {
+	r, _ := strconv.ParseInt(strings.TrimPrefix(s, "\\U"), 16, 32)
+
+	return string(r)
+}
+
+func RemoveDir(path string) error {
+	return os.RemoveAll(path)
 }
