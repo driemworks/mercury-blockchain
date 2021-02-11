@@ -64,7 +64,7 @@ func TestMineWithTimeout(t *testing.T) {
 
 func createRandomPendingBlock(miner common.Address) PendingBlock {
 	return NewPendingBlock(manifest.Hash{}, 0, miner, []manifest.SignedTx{
-		{manifest.Tx{From: manifest.NewAddress("tony"), To: manifest.NewAddress("theo"), CID: "QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", Data: ""}, []byte{}},
+		{manifest.Tx{From: manifest.NewAddress("to0ny"), To: manifest.NewAddress("theo"), CID: "QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH"}, []byte{}},
 	},
 	)
 }

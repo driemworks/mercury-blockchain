@@ -35,7 +35,7 @@ func walletNewAccountCmd() *cobra.Command {
 		Use:   "new-address",
 		Short: "Creates a new address with a new set of a elliptic-curve Private + Public keys.",
 		Run: func(cmd *cobra.Command, args []string) {
-			password := getPassPhrase("Please enter a password to encrypt the new wallet:", true)
+			password := getPassPhrase("Please enter a password to encrypt the new wallet: ", true)
 			dataDir := getDataDirFromCmd(cmd)
 
 			acc, err := wallet.NewKeystoreAccount(dataDir, password)

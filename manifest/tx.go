@@ -4,6 +4,7 @@ import (
 	"crypto/elliptic"
 	"crypto/sha256"
 	"encoding/json"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -14,11 +15,12 @@ func NewAddress(value string) common.Address {
 }
 
 type Tx struct {
-	From  common.Address `json: "from"`
-	To    common.Address `json: "to"`
-	CID   CID            `json: "cid"`
-	Data  string         `json: "data"`
-	Nonce uint           `json:"nonce"`
+	From   common.Address `json: "from"`
+	To     common.Address `json: "to"`
+	CID    CID            `json: "cid"`
+	Nonce  uint           `json:"nonce"`
+	Time   uint64         `json:"time"`
+	Amount float32        `json:"amount"`
 }
 
 type SignedTx struct {
@@ -26,20 +28,20 @@ type SignedTx struct {
 	Sig []byte `json:"signature"`
 }
 
-func NewTx(from common.Address, to common.Address, cid CID, nonce uint, data string) Tx {
-	return Tx{from, to, cid, data, nonce}
+func NewTx(from common.Address, to common.Address, cid CID, nonce uint, amount float32) Tx {
+	return Tx{from, to, cid, nonce, uint64(time.Now().Unix()), amount}
 }
 
 func NewSignedTx(tx Tx, sig []byte) SignedTx {
 	return SignedTx{tx, sig}
 }
 
-func (t Tx) IsReward() bool {
-	// what would be a meaningful reward in the context of file sharing?
-	// I suppose... the "in-app" currency maybe?
-	// maybe there could be different tiers? based on number of transactions/day
-	return t.Data == "reward"
-}
+// func (t Tx) IsReward() bool {
+// 	// what would be a meaningful reward in the context of file sharing?
+// 	// I suppose... the "in-app" currency maybe?
+// 	// maybe there could be different tiers? based on number of transactions/day
+// 	return t.Data == "reward"
+// }
 
 func (t Tx) Hash() (Hash, error) {
 	txJson, err := json.Marshal(t)

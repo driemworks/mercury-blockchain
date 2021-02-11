@@ -20,7 +20,7 @@ const endpointAddPeerQueryKeyMiner = "miner"
 
 func (n *Node) sync(ctx context.Context) error {
 	ticker := time.NewTicker(45 * time.Second)
-
+	n.doSync()
 	for {
 		select {
 		case <-ticker.C:

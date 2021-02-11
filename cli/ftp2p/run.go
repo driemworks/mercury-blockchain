@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/raphamorim/go-rainbow"
 	"github.com/spf13/cobra"
 )
 
@@ -15,14 +16,26 @@ func runCmd() *cobra.Command {
 		Use:   "run",
 		Short: "Run the ftp2p node",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("--------------------------------------------")
-			fmt.Println(fmt.Sprintf("FTP2P Version %s.%s.%s-beta", Major, Minor, Patch))
-			fmt.Println("--------------------------------------------")
-			fmt.Println("")
+
 			alias, _ := cmd.Flags().GetString(flagAlias)
 			miner, _ := cmd.Flags().GetString(flagMiner)
 			ip, _ := cmd.Flags().GetString(flagIP)
 			port, _ := cmd.Flags().GetUint64(flagPort)
+
+			fmt.Println("")
+			fmt.Println("\t\t " + rainbow.Bold(rainbow.Hex("#B164E3", `/$$$$$$$$ /$$$$$$$$ /$$$$$$$   /$$$$$$  /$$$$$$$ 
+		| $$_____/|__  $$__/| $$__  $$ /$$__  $$| $$__  $$
+		| $$         | $$   | $$  \ $$|__/  \ $$| $$  \ $$
+		| $$$$$      | $$   | $$$$$$$/  /$$$$$$/| $$$$$$$/
+		| $$__/      | $$   | $$____/  /$$____/ | $$____/ 
+		| $$         | $$   | $$      | $$      | $$      
+		| $$         | $$   | $$      | $$$$$$$$| $$      
+		|__/         |__/   |__/      |________/|__/      `)))
+			fmt.Println("")
+			fmt.Println(fmt.Sprintf("\t\t Version %s.%s.%s-beta, driemworks", Major, Minor, Patch))
+			fmt.Printf("\t\t Using miner address: %s\n", miner)
+			fmt.Printf("\t\t Using bootstrap node: %s:%d\n", "127.0.0.1", 8080)
+			fmt.Println("")
 			bootstrap := node.NewPeerNode(
 				"127.0.0.1",
 				8080,

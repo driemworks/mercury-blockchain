@@ -12,12 +12,12 @@ var genesisJson = `
     "genesis_time": "2021-02-07T00:00:00.000000000Z",
     "chain_id": "driemworks-blockchain",
     "manifest": {
-        "0x7f3A1bB3B4b39838e9C2c20C74F2Be4a8b73d696": {
+        "0x11494645b11e185ade0906d3a5f6b37b72a6c8dc": {
 			"alias": "tony",
             "sent": [],
             "inbox": [],
 			"balance": 100000,
-			"pendingBalance": 100000
+			"pending_balance": 100000
         }
     }
 }`

@@ -11,35 +11,23 @@ import (
 	goCid "github.com/ipfs/go-cid"
 )
 
+// SyncRes is the response struct for representing new blocks to sync
 type SyncRes struct {
 	Blocks []manifest.Block `json:"blocks"`
 }
 
+// AddPeerRes is the response struct to represent if new peer addition
 type AddPeerRes struct {
 	Success bool   `json:"success"`
 	Error   string `json:"error"`
 }
 
+// ErrorResponse to represent any error that happens
 type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
-type ManifestResponse struct {
-	Hash     manifest.Hash                        `json:"hash"`
-	Manifest map[common.Address]manifest.Manifest `json:"manifest"`
-}
-
-type CidAddRequest struct {
-	From    string `json:"from"`
-	To      string `json:"to"`
-	Cid     string `json:"cid"`
-	FromPwd string `json:"from_pwd"`
-}
-
-type CidAddResponse struct {
-	Success bool `json:"success"`
-}
-
+// StatusResponse TODO
 type StatusResponse struct {
 	Hash       manifest.Hash       `json:"block_hash"`
 	Number     uint64              `json:"block_number"`
@@ -48,47 +36,93 @@ type StatusResponse struct {
 	PendingTxs []manifest.SignedTx `json:"pending_txs"`
 }
 
-/**
-* List the manifest
- */
-func listManifestHandler(w http.ResponseWriter, r *http.Request, state *manifest.State) {
-	writeRes(w, ManifestResponse{state.LatestBlockHash(), state.Manifest})
+type TokenRequestResponse struct {
+	Success bool    `json:"success"`
+	Amount  float32 `json:"amount"`
+}
+
+type sendTokensRequest struct {
+	Amount  float32 `json:"amount"`
+	To      string  `json:"to"`
+	FromPwd string  `json:"from_pwd"`
+}
+
+type manifestResponse struct {
+	Hash     manifest.Hash                        `json:"hash"`
+	Manifest map[common.Address]manifest.Manifest `json:"manifest"`
+}
+
+type userMailboxResponse struct {
+	Hash    manifest.Hash     `json:"hash"`
+	Address common.Address    `json:"address"`
+	Alias   string            `json:"alias"`
+	Mailbox manifest.Manifest `json:"mailbox"`
+}
+
+type cidAddRequest struct {
+	To      string `json:"to"`
+	Cid     string `json:"cid"`
+	FromPwd string `json:"from_pwd"`
+}
+
+type cidAddResponse struct {
+	Success bool `json:"success"`
 }
 
 /**
-*
+* List the manifest
  */
+func viewMailboxHandler(w http.ResponseWriter, r *http.Request, node *Node) {
+	// verify that addressParam is a valid address
+	from := node.info.Address
+	// validations to make sure the sender/receiver are valid addresses
+	if from.String() == common.HexToAddress("").String() {
+		writeErrRes(w, fmt.Errorf("%s is not a valid address", from))
+		return
+	}
+	// address := manifest.NewAddress(from)
+	writeRes(w, userMailboxResponse{node.state.LatestBlockHash(),
+		from, node.alias, node.state.Manifest[from]})
+}
+
+/**
+* TODO - can probably expand this to handle generic state mutation, then restrict the
+ use of it based on endpoint parameters
+*/
 func addCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
-	req := CidAddRequest{}
+	req := cidAddRequest{}
 	err := readReq(r, &req)
 	if err != nil {
 		writeErrRes(w, err)
 		return
 	}
-
-	from := manifest.NewAddress(req.From)
-	// validations to make sure the sender/receiver are valid addresses
-	if from.String() == common.HexToAddress("").String() {
-		writeErrRes(w, fmt.Errorf("%s is an invalid 'from' sender", from.String()))
+	// safe to assume 'from' is a valid address
+	from := node.info.Address
+	to := manifest.NewAddress(req.To)
+	// validations to make sure the recipient is valid addresses
+	if to.String() == common.HexToAddress("").String() {
+		writeErrRes(w, fmt.Errorf("%s is an invalid 'to' address", to.String()))
 		return
 	}
-	// validations to make sure the CID is valid
 	if req.FromPwd == "" {
-		writeErrRes(w, fmt.Errorf("password to decrypt the %s address is required. 'from_pwd' is empty", from.String()))
+		writeErrRes(w, fmt.Errorf("password to decrypt the %s address is required. 'from_pwd' is empty", from))
 		return
 	}
-
+	// check that the pending balance is greater than zero
+	if node.state.Manifest[from].Balance <= float32(0) {
+		writeErrRes(w, fmt.Errorf("your pending balance is non-positive. Please add funds and try again"))
+		return
+	}
 	// verify  the tx contains a valid CID
 	_, err = goCid.Decode(fmt.Sprintf("%s", req.Cid))
 	if err != nil {
 		writeErrRes(w, err)
 		return
 	}
-
-	nonce := node.state.GetNextAccountNonce(from)
-	tx := manifest.NewTx(manifest.NewAddress(req.From),
-		manifest.NewAddress(req.To), manifest.NewCID(req.Cid), nonce, "")
-	signedTx, err := wallet.SignTxWithKeystoreAccount(tx, from, req.FromPwd, wallet.GetKeystoreDirPath(node.datadir))
+	nonce := node.state.Account2Nonce[node.info.Address] + 1
+	// TODO - the cost to send a cid is always 1?
+	tx := manifest.NewTx(from, manifest.NewAddress(req.To), manifest.NewCID(req.Cid), nonce, 1)
+	signedTx, err := wallet.SignTxWithKeystoreAccount(tx, node.info.Address, req.FromPwd, wallet.GetKeystoreDirPath(node.datadir))
 	if err != nil {
 		writeErrRes(w, err)
 		return
@@ -98,8 +132,36 @@ func addCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		writeErrRes(w, err)
 		return
 	}
-	writeRes(w, CidAddResponse{Success: true})
+	writeRes(w, cidAddResponse{Success: true})
+}
 
+// host:port/tokens POST
+func requestTokensHandler(w http.ResponseWriter, r *http.Request, node *Node) {
+	req := sendTokensRequest{}
+	err := readReq(r, &req)
+	if err != nil {
+		writeErrRes(w, err)
+		return
+	}
+	if req.Amount <= 0 {
+		writeErrRes(w, fmt.Errorf("Requested amount should be greater than zero but was %d", req.Amount))
+		return
+	}
+	from := node.info.Address
+	nonce := node.state.Account2Nonce[node.info.Address] + 1
+	tx := manifest.NewTx(from, manifest.NewAddress(req.To), manifest.NewCID(""), nonce, float32(req.Amount))
+	signedTx, err := wallet.SignTxWithKeystoreAccount(tx, from, req.FromPwd,
+		wallet.GetKeystoreDirPath(node.datadir))
+	if err != nil {
+		writeErrRes(w, err)
+		return
+	}
+	err = node.AddPendingTX(signedTx, node.info)
+	if err != nil {
+		writeErrRes(w, err)
+		return
+	}
+	writeRes(w, TokenRequestResponse{Success: true, Amount: req.Amount})
 }
 
 /**

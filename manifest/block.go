@@ -52,7 +52,7 @@ type BlockFS struct {
  Hash the block's transactions
 */
 func (b *Block) Hash() (Hash, error) {
-	txJson, err := json.Marshal(b.TXs)
+	txJson, err := json.Marshal(b)
 	if err != nil {
 		return Hash{}, err
 	}
@@ -71,10 +71,11 @@ func NewBlock(parent Hash, time uint64, number uint64, txs []SignedTx, nonce uin
 	IsBlockHashValid
 */
 func IsBlockHashValid(hash Hash) bool {
-	// for now, check that first 4 values are all '0'
-	return fmt.Sprintf("%x", hash[0]) == "0" &&
-		fmt.Sprintf("%x", hash[1]) == "0" &&
-		fmt.Sprintf("%x", hash[2]) == "0" &&
-		fmt.Sprintf("%x", hash[3]) != "0"
+	return fmt.Sprintf("%x", hash[0]) == "1"
+	//  &&
+	// 	fmt.Sprintf("%x", hash[1]) == "0"
+	// &&
+	// fmt.Sprintf("%x", hash[2]) == "0" &&
+	// fmt.Sprintf("%x", hash[3]) != "0"
 
 }

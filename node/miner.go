@@ -10,8 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+// DefaultMiner is the miner address used if one is not provided
 const DefaultMiner = "0xasdf"
 
+// PendingBlock represents a block before it has been mined
 type PendingBlock struct {
 	parent manifest.Hash
 	number uint64
@@ -53,7 +55,7 @@ func Mine(ctx context.Context, pb PendingBlock) (manifest.Block, error) {
 		nonce = generateNonce()
 
 		if attempt%1000000 == 0 || attempt == 1 {
-			fmt.Printf("Mining %d Pending TXs. Attempt: %d\n", len(pb.txs), attempt)
+			fmt.Printf("Mining %d Pending TXs. Attempt: %d.\n", len(pb.txs), attempt)
 		}
 
 		block = manifest.NewBlock(pb.parent, pb.time, pb.number, pb.txs, nonce, pb.miner)
@@ -71,7 +73,6 @@ func Mine(ctx context.Context, pb PendingBlock) (manifest.Block, error) {
 	fmt.Printf("\tCreated: '%v'\n", block.Header.Time)
 	fmt.Printf("\tMiner: '%v'\n", block.Header.Miner)
 	fmt.Printf("\tParent: '%v'\n\n", block.Header.Parent.Hex())
-
 	fmt.Printf("\tAttempt: '%v'\n", attempt)
 	fmt.Printf("\tTime: %s\n\n", time.Since(start))
 

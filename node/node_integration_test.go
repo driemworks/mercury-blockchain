@@ -57,7 +57,7 @@ func TestNode_Mining(t *testing.T) {
 	// because the n.Run() few lines below is a blocking call
 	go func() {
 		time.Sleep(time.Second * miningIntervalSeconds / 3)
-		tx := manifest.SignedTx{manifest.NewTx(manifest.NewAddress("tony"), manifest.NewAddress("tonya"), manifest.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH"), 10, ""), []byte{}}
+		tx := manifest.SignedTx{manifest.NewTx(manifest.NewAddress("tony"), manifest.NewAddress("tonya"), manifest.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH"), 10, 0), []byte{}}
 
 		_ = n.AddPendingTX(tx, nInfo)
 	}()
@@ -66,7 +66,7 @@ func TestNode_Mining(t *testing.T) {
 	// that it came in - while the first TX is being mined
 	go func() {
 		time.Sleep(time.Second*miningIntervalSeconds + 2)
-		tx := manifest.SignedTx{manifest.NewTx(manifest.NewAddress("tony"), manifest.NewAddress("theo"), manifest.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH"), 10, ""), []byte{}}
+		tx := manifest.SignedTx{manifest.NewTx(manifest.NewAddress("tony"), manifest.NewAddress("theo"), manifest.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH"), 10, 0), []byte{}}
 
 		_ = n.AddPendingTX(tx, nInfo)
 	}()

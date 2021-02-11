@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -13,13 +14,15 @@ import (
 type CID string
 
 type SentItem struct {
-	To  common.Address `json:"to"`
-	CID CID            `json:"cid"`
+	To   common.Address `json:"to"`
+	CID  CID            `json:"cid"`
+	Hash Hash           `json:"hash"`
 }
 
 type InboxItem struct {
 	From common.Address `json:"from"`
 	CID  CID            `json:"cid"`
+	Hash Hash           `json:"hash"`
 }
 
 type Manifest struct {
@@ -56,6 +59,8 @@ func NewStateFromDisk(datadir string) (*State, error) {
 	// using manifest as var and Manifest as type, but they are not the same thing
 	manifest := make(map[common.Address]Manifest)
 	for account, mailbox := range gen.Manifest {
+		fmt.Printf("the account is %x\n", account)
+		fmt.Printf("the account balance is %x\n", mailbox.Balance)
 		manifest[account] = Manifest{mailbox.Sent, mailbox.Inbox, mailbox.Balance, mailbox.PendingBalance}
 	}
 
@@ -79,7 +84,7 @@ func NewStateFromDisk(datadir string) (*State, error) {
 		if err := json.Unmarshal(blockFsJSON, &blockFs); err != nil {
 			return nil, err
 		}
-		if err = applyTXs(blockFs.Value.TXs, state); err != nil {
+		if err = applyBlock(blockFs.Value, state); err != nil {
 			return nil, err
 		}
 		state.latestBlock = blockFs.Value
@@ -89,21 +94,21 @@ func NewStateFromDisk(datadir string) (*State, error) {
 	return state, nil
 }
 
-func (s *State) AddBlocks(blocks []Block) error {
-	for _, b := range blocks {
-		_, err := s.AddBlock(b)
-		if err != nil {
-			return err
-		}
-	}
+// func (s *State) AddBlocks(blocks []Block) error {
+// 	for _, b := range blocks {
+// 		_, err := s.AddBlock(b)
+// 		if err != nil {
+// 			return err
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 func (s *State) AddBlock(b Block) (Hash, error) {
 	pendingState := s.copy()
 
-	err := applyBlock(b, pendingState)
+	err := applyBlock(b, &pendingState)
 	if err != nil {
 		return Hash{}, err
 	}
@@ -111,10 +116,6 @@ func (s *State) AddBlock(b Block) (Hash, error) {
 	blockHash, err := b.Hash()
 	if err != nil {
 		return Hash{}, err
-	}
-
-	if !IsBlockHashValid(blockHash) {
-		return Hash{}, fmt.Errorf("invalid block hash %x", blockHash)
 	}
 
 	blockFs := BlockFS{blockHash, b}
@@ -132,6 +133,7 @@ func (s *State) AddBlock(b Block) (Hash, error) {
 		return Hash{}, err
 	}
 
+	s.Account2Nonce = pendingState.Account2Nonce
 	s.Manifest = pendingState.Manifest
 	s.latestBlockHash = blockHash
 	s.latestBlock = b
@@ -147,8 +149,22 @@ func (s *State) NextBlockNumber() uint64 {
 	return s.LatestBlock().Header.Number + 1
 }
 
-func (s *State) GetNextAccountNonce(account common.Address) uint {
-	return s.Account2Nonce[account] + 1
+/**
+*
+ */
+func applyTXs(txs []SignedTx, s *State) error {
+	sort.Slice(txs, func(i, j int) bool {
+		return txs[i].Time < txs[j].Time
+	})
+
+	for _, tx := range txs {
+		err := applyTx(tx, s)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 /*
@@ -157,19 +173,45 @@ func (s *State) GetNextAccountNonce(account common.Address) uint {
 * 2) appends an inbox item to t he tx's to account
  */
 func applyTx(tx SignedTx, s *State) error {
-	// if it is a reward, just.. do nothing for now..
-	if tx.IsReward() {
-		return nil
+	ok, err := tx.IsAuthentic()
+	if err != nil {
+		return err
 	}
-	var senderDirectory = s.Manifest[tx.From]
-	senderDirectory.Sent = append(senderDirectory.Sent, SentItem{tx.To, tx.CID})
-	senderDirectory.Balance--
-	s.Manifest[tx.From] = senderDirectory
 
-	var receiverDirectory = s.Manifest[tx.To]
-	receiverDirectory.Inbox = append(receiverDirectory.Inbox, InboxItem{tx.From, tx.CID})
-	s.Manifest[tx.To] = receiverDirectory
+	if !ok {
+		return fmt.Errorf("bad Tx. Sender '%s' is forged", tx.From.String())
+	}
 
+	expectedNonce := s.Account2Nonce[tx.From] + 1
+	if tx.Nonce != expectedNonce {
+		return fmt.Errorf("bad Tx. next nonce must be '%d', not '%d'", expectedNonce, tx.Nonce)
+	}
+
+	// TODO - what's happening here?
+	fmt.Println(s.Manifest[tx.To].PendingBalance)
+	fmt.Println(s.Manifest[tx.From])
+	if s.Manifest[tx.From].PendingBalance < 1 {
+		return fmt.Errorf("bad Tx. You have no remaining balance")
+	}
+
+	txHash, err := tx.Hash()
+	if err != nil {
+		return fmt.Errorf("bad Tx. Can't calculate tx hash")
+	}
+
+	// TODO update balances!!!!!
+	// update sender balance and sent items
+	var senderMailbox = s.Manifest[tx.From]
+	senderMailbox.Sent = append(senderMailbox.Sent, SentItem{tx.To, tx.CID, txHash})
+	senderMailbox.Balance = senderMailbox.PendingBalance
+	s.Manifest[tx.From] = senderMailbox
+	// update recipient inbox items
+	var receipientMailbox = s.Manifest[tx.To]
+	receipientMailbox.Inbox = append(receipientMailbox.Inbox, InboxItem{tx.From, tx.CID, txHash})
+	s.Manifest[tx.To] = receipientMailbox
+	tmp := s.Account2Nonce
+	tmp[tx.From] = tx.Nonce
+	s.Account2Nonce = tmp
 	return nil
 }
 
@@ -180,7 +222,7 @@ func NewCID(cid string) CID {
 // applyBlock verifies if block can be added to the blockchain.
 //
 // Block metadata are verified as well as transactions within (sufficient balances, etc).
-func applyBlock(b Block, s State) error {
+func applyBlock(b Block, s *State) error {
 	nextExpectedBlockNumber := s.latestBlock.Header.Number + 1
 
 	if s.hasGenesisBlock && b.Header.Number != nextExpectedBlockNumber {
@@ -191,19 +233,23 @@ func applyBlock(b Block, s State) error {
 		return fmt.Errorf("next block parent hash must be '%x' not '%x'", s.latestBlockHash, b.Header.Parent)
 	}
 
-	return applyTXs(b.TXs, &s)
-}
-
-/**
-*
- */
-func applyTXs(txs []SignedTx, s *State) error {
-	for _, tx := range txs {
-		err := applyTx(tx, s)
-		if err != nil {
-			return err
-		}
+	hash, err := b.Hash()
+	if err != nil {
+		return err
 	}
+	if !IsBlockHashValid(hash) {
+		return fmt.Errorf("Invalid block hash")
+	}
+	err = applyTXs(b.TXs, s)
+	if err != nil {
+		return err
+	}
+
+	// reward 1000 each time a tx is mined... does this seem like an excessive amount?
+	tmp := s.Manifest[b.Header.Miner]
+	tmp.Balance += 100
+	tmp.PendingBalance += 100
+	s.Manifest[b.Header.Miner] = tmp
 
 	return nil
 }
@@ -234,13 +280,12 @@ func (s *State) copy() State {
 	copy.latestBlockHash = s.latestBlockHash
 	copy.txMempool = make([]Tx, len(s.txMempool))
 	copy.Manifest = make(map[common.Address]Manifest)
-	// deep copy transactions
-	for _, tx := range s.txMempool {
-		copy.txMempool = append(copy.txMempool, tx)
-	}
-	// deep copy manifest
+	copy.Account2Nonce = make(map[common.Address]uint)
 	for account, manifest := range s.Manifest {
 		copy.Manifest[account] = manifest
+	}
+	for account, nonce := range s.Account2Nonce {
+		copy.Account2Nonce[account] = nonce
 	}
 	return copy
 }
