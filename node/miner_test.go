@@ -2,8 +2,8 @@ package node
 
 import (
 	"context"
-	"driemcoin/main/manifest"
 	"encoding/hex"
+	"ftp2p/main/manifest"
 	"testing"
 	"time"
 

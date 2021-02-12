@@ -1,15 +1,16 @@
 package node
 
 import (
+	"bytes"
 	"context"
-	"driemcoin/main/manifest"
 	"encoding/json"
 	"fmt"
+	"ftp2p/main/manifest"
 	"net/http"
 	"time"
 
-	"github.com/briandowns/spinner"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/raphamorim/go-rainbow"
 )
 
 // const httpPort = 8080
@@ -68,11 +69,11 @@ func NewPeerNode(ip string, port uint64, isBootstrap bool, address common.Addres
 * Start the node's HTTP client
  */
 func (n *Node) Run(ctx context.Context) error {
+	// s := spinner.New(spinner.CharSets[9], 10*time.Millisecond)
+	// s.Start()
 	fmt.Println(fmt.Sprintf("Listening on: %s:%d", n.info.IP, n.info.Port))
-	s := spinner.New(spinner.CharSets[9], 50*time.Millisecond)
-	s.Start()
 	state, err := manifest.NewStateFromDisk(n.datadir)
-	fmt.Println("Succesfully loaded the state from disk")
+	// fmt.Println("Succesfully loaded the state from disk")
 
 	if err != nil {
 		return err
@@ -109,8 +110,7 @@ func (n *Node) Run(ctx context.Context) error {
 	})
 
 	server := &http.Server{Addr: fmt.Sprintf(":%d", n.port)}
-	s.Stop()
-	// channels are weird..
+	// s.Stop()
 	go func() {
 		<-ctx.Done()
 		_ = server.Close()
@@ -139,7 +139,7 @@ func (n *Node) mine(ctx context.Context) error {
 					miningCtx, stopCurrentMining = context.WithCancel(ctx)
 					err := n.minePendingTXs(miningCtx)
 					if err != nil {
-						fmt.Printf("ERROR: %s\n", err)
+						fmt.Printf(rainbow.Red("ERROR: %s\n"), err)
 					}
 
 					n.isMining = false
@@ -149,7 +149,7 @@ func (n *Node) mine(ctx context.Context) error {
 		case block, _ := <-n.newSyncedBlocks:
 			if n.isMining {
 				blockHash, _ := block.Hash()
-				fmt.Printf("\nPeer mined next Block '%s' faster :(\n", blockHash.Hex())
+				fmt.Printf("\nPeer mined next Block '%s' faster :(\n", rainbow.Yellow(blockHash.Hex()))
 
 				n.removeMinedPendingTXs(block)
 				stopCurrentMining()
@@ -191,28 +191,7 @@ func (n *Node) removeMinedPendingTXs(block manifest.Block) {
 	for _, tx := range block.TXs {
 		txHash, _ := tx.Hash()
 		if _, exists := n.pendingTXs[txHash.Hex()]; exists {
-			fmt.Printf("\t-archiving mined TX: %s\n", txHash.Hex())
-			// remove pending transactions from sender's sent items
-			// tmpFrom := n.state.Manifest[tx.From]
-			// for idx, sentItem := range n.state.Manifest[tx.From].Sent {
-			// 	// sentItem will only happen once
-			// 	if sentItem.Hash == txHash {
-			// 		fmt.Printf("Index: %d, Removing transaction with hash %x", idx, txHash)
-			// 		// remove the item from the inbox
-			// 		tmpFrom.Sent = append(tmpFrom.Sent[:idx], tmpFrom.Sent[idx+1:]...)
-			// 	}
-			// }
-			// // assign the new manifest
-			// n.state.Manifest[tx.From] = tmpFrom
-			// // remove pending transactions from the recipient's inbox
-			// tmpTo := n.state.Manifest[tx.To]
-			// for idx, inboxItem := range tmpTo.Inbox {
-			// 	if inboxItem.Hash == txHash {
-			// 		tmpTo.Inbox = append(tmpTo.Inbox[:idx], tmpTo.Inbox[idx+1:]...)
-			// 	}
-			// }
-			// n.state.Manifest[tx.To] = tmpTo
-
+			fmt.Printf("\tArchiving mined TX: %s\n", rainbow.Yellow(txHash.Hex()))
 			n.archivedTXs[txHash.Hex()] = tx
 			delete(n.pendingTXs, txHash.Hex())
 		}
@@ -255,7 +234,12 @@ func (n *Node) AddPendingTX(tx manifest.SignedTx, fromPeer PeerNode) error {
 	_, isArchived := n.archivedTXs[txHash.Hex()]
 
 	if !isAlreadyPending && !isArchived {
-		fmt.Printf("Added Pending TX %s from Peer %s\n", txJson, fromPeer.TcpAddress())
+		var prettyJSON bytes.Buffer
+		err = json.Indent(&prettyJSON, txJson, "", "\t\t")
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Added Pending TX \n %s \n from Peer %s\n", string(prettyJSON.Bytes()), rainbow.Green(fromPeer.TcpAddress()))
 		n.pendingTXs[txHash.Hex()] = tx
 		n.newPendingTXs <- tx
 		// TODO - move this to new func

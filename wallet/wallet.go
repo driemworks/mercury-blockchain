@@ -3,8 +3,8 @@ package wallet
 import (
 	"crypto/ecdsa"
 	"crypto/sha256"
-	"driemcoin/main/manifest"
 	"fmt"
+	"ftp2p/main/manifest"
 	"io/ioutil"
 	"path/filepath"
 

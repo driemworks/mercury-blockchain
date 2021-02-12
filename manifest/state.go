@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -59,8 +60,6 @@ func NewStateFromDisk(datadir string) (*State, error) {
 	// using manifest as var and Manifest as type, but they are not the same thing
 	manifest := make(map[common.Address]Manifest)
 	for account, mailbox := range gen.Manifest {
-		fmt.Printf("the account is %x\n", account)
-		fmt.Printf("the account balance is %x\n", mailbox.Balance)
 		manifest[account] = Manifest{mailbox.Sent, mailbox.Inbox, mailbox.Balance, mailbox.PendingBalance}
 	}
 
@@ -94,17 +93,6 @@ func NewStateFromDisk(datadir string) (*State, error) {
 	return state, nil
 }
 
-// func (s *State) AddBlocks(blocks []Block) error {
-// 	for _, b := range blocks {
-// 		_, err := s.AddBlock(b)
-// 		if err != nil {
-// 			return err
-// 		}
-// 	}
-
-// 	return nil
-// }
-
 func (s *State) AddBlock(b Block) (Hash, error) {
 	pendingState := s.copy()
 
@@ -125,8 +113,13 @@ func (s *State) AddBlock(b Block) (Hash, error) {
 		return Hash{}, err
 	}
 
+	var prettyJson bytes.Buffer
+	err = json.Indent(&prettyJson, blockFsJson, "", "\t")
+	if err != nil {
+		return Hash{}, err
+	}
 	fmt.Printf("Persisting new Block to disk:\n")
-	fmt.Printf("\t%s\n", blockFsJson)
+	fmt.Printf("\t%s\n", &prettyJson)
 
 	_, err = s.dbFile.Write(append(blockFsJson, '\n'))
 	if err != nil {
@@ -187,9 +180,6 @@ func applyTx(tx SignedTx, s *State) error {
 		return fmt.Errorf("bad Tx. next nonce must be '%d', not '%d'", expectedNonce, tx.Nonce)
 	}
 
-	// TODO - what's happening here?
-	fmt.Println(s.Manifest[tx.To].PendingBalance)
-	fmt.Println(s.Manifest[tx.From])
 	if s.Manifest[tx.From].PendingBalance < 1 {
 		return fmt.Errorf("bad Tx. You have no remaining balance")
 	}
@@ -199,15 +189,17 @@ func applyTx(tx SignedTx, s *State) error {
 		return fmt.Errorf("bad Tx. Can't calculate tx hash")
 	}
 
-	// TODO update balances!!!!!
-	// update sender balance and sent items
 	var senderMailbox = s.Manifest[tx.From]
 	senderMailbox.Sent = append(senderMailbox.Sent, SentItem{tx.To, tx.CID, txHash})
 	senderMailbox.Balance = senderMailbox.PendingBalance
 	s.Manifest[tx.From] = senderMailbox
 	// update recipient inbox items
 	var receipientMailbox = s.Manifest[tx.To]
-	receipientMailbox.Inbox = append(receipientMailbox.Inbox, InboxItem{tx.From, tx.CID, txHash})
+	receipientMailbox.Balance = receipientMailbox.PendingBalance
+	// add a new inbox item if there is a CID
+	if tx.CID != NewCID("") {
+		receipientMailbox.Inbox = append(receipientMailbox.Inbox, InboxItem{tx.From, tx.CID, txHash})
+	}
 	s.Manifest[tx.To] = receipientMailbox
 	tmp := s.Account2Nonce
 	tmp[tx.From] = tx.Nonce
@@ -226,7 +218,7 @@ func applyBlock(b Block, s *State) error {
 	nextExpectedBlockNumber := s.latestBlock.Header.Number + 1
 
 	if s.hasGenesisBlock && b.Header.Number != nextExpectedBlockNumber {
-		return fmt.Errorf("next expected block must be '%d' not '%d'", nextExpectedBlockNumber, b.Header.Number)
+		return fmt.Errorf("next expected block number must be '%d' not '%d'", nextExpectedBlockNumber, b.Header.Number)
 	}
 
 	if s.hasGenesisBlock && s.latestBlock.Header.Number > 0 && !reflect.DeepEqual(b.Header.Parent, s.latestBlockHash) {
@@ -245,10 +237,10 @@ func applyBlock(b Block, s *State) error {
 		return err
 	}
 
-	// reward 1000 each time a tx is mined... does this seem like an excessive amount?
+	// reward 100 each time a tx is mined... does this seem like an excessive amount?
 	tmp := s.Manifest[b.Header.Miner]
-	tmp.Balance += 100
-	tmp.PendingBalance += 100
+	tmp.Balance += 1000
+	tmp.PendingBalance += 1000
 	s.Manifest[b.Header.Miner] = tmp
 
 	return nil

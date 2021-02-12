@@ -2,7 +2,7 @@ package node
 
 import (
 	"context"
-	"driemcoin/main/manifest"
+	"ftp2p/main/manifest"
 	"os"
 	"path/filepath"
 	"testing"

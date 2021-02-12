@@ -1,14 +1,15 @@
 package node
 
 import (
-	"driemcoin/main/manifest"
-	"driemcoin/main/wallet"
 	"fmt"
+	"ftp2p/main/manifest"
+	"ftp2p/main/wallet"
 	"net/http"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	goCid "github.com/ipfs/go-cid"
+	"github.com/raphamorim/go-rainbow"
 )
 
 // SyncRes is the response struct for representing new blocks to sync
@@ -121,6 +122,7 @@ func addCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	}
 	nonce := node.state.Account2Nonce[node.info.Address] + 1
 	// TODO - the cost to send a cid is always 1?
+	// should this really go to the tx's to value, or to the 'system' (bootstrap) node?
 	tx := manifest.NewTx(from, manifest.NewAddress(req.To), manifest.NewCID(req.Cid), nonce, 1)
 	signedTx, err := wallet.SignTxWithKeystoreAccount(tx, node.info.Address, req.FromPwd, wallet.GetKeystoreDirPath(node.datadir))
 	if err != nil {
@@ -215,6 +217,6 @@ func addPeerHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	}
 	peer := NewPeerNode(peerIP, peerPort, false, manifest.NewAddress(minerRaw), true)
 	node.AddPeer(peer)
-	fmt.Printf("Peer '%s' was added into KnownPeers\n", peer.TcpAddress())
+	fmt.Printf("Peer "+rainbow.Green("'%s'")+" was added into KnownPeers\n", peer.TcpAddress())
 	writeRes(w, AddPeerRes{true, ""})
 }

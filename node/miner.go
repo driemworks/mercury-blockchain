@@ -2,12 +2,13 @@ package node
 
 import (
 	"context"
-	"driemcoin/main/manifest"
 	"fmt"
+	"ftp2p/main/manifest"
 	"math/rand"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/raphamorim/go-rainbow"
 )
 
 // DefaultMiner is the miner address used if one is not provided
@@ -33,7 +34,7 @@ func generateNonce() uint32 {
 
 func Mine(ctx context.Context, pb PendingBlock) (manifest.Block, error) {
 	if len(pb.txs) == 0 {
-		return manifest.Block{}, fmt.Errorf("block is empty - there is nothing to mine")
+		return manifest.Block{}, fmt.Errorf(rainbow.Red("block is empty - there is nothing to mine"))
 	}
 
 	start := time.Now()
@@ -47,7 +48,7 @@ func Mine(ctx context.Context, pb PendingBlock) (manifest.Block, error) {
 		case <-ctx.Done():
 			fmt.Println("Mining cancelled!")
 
-			return manifest.Block{}, fmt.Errorf("mining cancelled. %s", ctx.Err())
+			return manifest.Block{}, fmt.Errorf(rainbow.Red("mining cancelled. %s"), ctx.Err())
 		default:
 		}
 
@@ -55,7 +56,7 @@ func Mine(ctx context.Context, pb PendingBlock) (manifest.Block, error) {
 		nonce = generateNonce()
 
 		if attempt%1000000 == 0 || attempt == 1 {
-			fmt.Printf("Mining %d Pending TXs. Attempt: %d.\n", len(pb.txs), attempt)
+			fmt.Printf("Mining "+rainbow.Magenta("%d")+" Pending TXs. Attempt: "+rainbow.Magenta("%d")+".\n", len(pb.txs), attempt)
 		}
 
 		block = manifest.NewBlock(pb.parent, pb.time, pb.number, pb.txs, nonce, pb.miner)
@@ -67,14 +68,18 @@ func Mine(ctx context.Context, pb PendingBlock) (manifest.Block, error) {
 		hash = blockHash
 	}
 
-	fmt.Printf("\nMined new Block '%x' using PoW🎉🎉🎉%s:\n", hash, manifest.Unicode("\\U1F389"))
-	fmt.Printf("\tHeight: '%v'\n", block.Header.Number)
-	fmt.Printf("\tNonce: '%v'\n", block.Header.Nonce)
-	fmt.Printf("\tCreated: '%v'\n", block.Header.Time)
-	fmt.Printf("\tMiner: '%v'\n", block.Header.Miner)
-	fmt.Printf("\tParent: '%v'\n\n", block.Header.Parent.Hex())
-	fmt.Printf("\tAttempt: '%v'\n", attempt)
-	fmt.Printf("\tTime: %s\n\n", time.Since(start))
+	fmt.Printf("\nMined new Block '%x':\n", info(fmt.Sprint(hash)))
+	fmt.Printf("\tHeight: '%v'\n", info(fmt.Sprint(block.Header.Number)))
+	fmt.Printf("\tNonce: '%v'\n", info(fmt.Sprint(block.Header.Nonce)))
+	fmt.Printf("\tCreated: '%v'\n", info(fmt.Sprint(block.Header.Time)))
+	fmt.Printf("\tMiner: '%v'\n", info(fmt.Sprint(block.Header.Miner)))
+	fmt.Printf("\tParent: '%v'\n\n", info(fmt.Sprint(block.Header.Parent.Hex())))
+	fmt.Printf("\tAttempt: '%v'\n", info(fmt.Sprint(attempt)))
+	fmt.Printf("\tTime: %s\n\n", info(fmt.Sprint(time.Since(start))))
 
 	return block, nil
+}
+
+func info(msg string) string {
+	return rainbow.Magenta(msg)
 }

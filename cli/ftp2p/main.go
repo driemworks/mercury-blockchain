@@ -1,8 +1,8 @@
 package main
 
 import (
-	"driemcoin/main/manifest"
 	"fmt"
+	"ftp2p/main/manifest"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -14,6 +14,8 @@ const flagPort = "port"
 const flagMiner = "miner"
 const flagAlias = "alias"
 const flagKeystoreFile = "keystore"
+const flagBootstrapIP = "bootstrap-ip"
+const flagBootstrapPort = "bootstrap-port"
 
 func main() {
 	var ftp2pCmd = &cobra.Command{

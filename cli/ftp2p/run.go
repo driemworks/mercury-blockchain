@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"driemcoin/main/manifest"
-	"driemcoin/main/node"
 	"fmt"
+	"ftp2p/main/manifest"
+	"ftp2p/main/node"
 	"os"
 
 	"github.com/raphamorim/go-rainbow"
@@ -21,7 +21,10 @@ func runCmd() *cobra.Command {
 			miner, _ := cmd.Flags().GetString(flagMiner)
 			ip, _ := cmd.Flags().GetString(flagIP)
 			port, _ := cmd.Flags().GetUint64(flagPort)
+			bootstrapIP, _ := cmd.Flags().GetString(flagBootstrapIP)
+			bootstrapPort, _ := cmd.Flags().GetUint64(flagBootstrapPort)
 
+			fmt.Println("")
 			fmt.Println("")
 			fmt.Println("\t\t " + rainbow.Bold(rainbow.Hex("#B164E3", `/$$$$$$$$ /$$$$$$$$ /$$$$$$$   /$$$$$$  /$$$$$$$ 
 		| $$_____/|__  $$__/| $$__  $$ /$$__  $$| $$__  $$
@@ -32,15 +35,15 @@ func runCmd() *cobra.Command {
 		| $$         | $$   | $$      | $$$$$$$$| $$      
 		|__/         |__/   |__/      |________/|__/      `)))
 			fmt.Println("")
-			fmt.Println(fmt.Sprintf("\t\t Version %s.%s.%s-beta, driemworks", Major, Minor, Patch))
-			fmt.Printf("\t\t Using miner address: %s\n", miner)
-			fmt.Printf("\t\t Using bootstrap node: %s:%d\n", "127.0.0.1", 8080)
+			fmt.Println(fmt.Sprintf("\t\t Version %s.%s.%s-beta", Major, Minor, Patch))
+			fmt.Printf("\t\t Using address: %s\n", rainbow.Green(miner))
+			fmt.Printf("\t\t Using bootstrap node: %s:%s\n", rainbow.Green("127.0.0.1"), rainbow.Green(fmt.Sprint(8080)))
 			fmt.Println("")
 			bootstrap := node.NewPeerNode(
-				"127.0.0.1",
-				8080,
+				bootstrapIP,
+				bootstrapPort,
 				true,
-				manifest.NewAddress("tony"),
+				manifest.NewAddress(""), // is this even really needed...?
 				false,
 			)
 			n := node.NewNode(alias, getDataDirFromCmd(cmd), ip, port,
@@ -58,5 +61,7 @@ func runCmd() *cobra.Command {
 	runCmd.Flags().String(flagMiner, node.DefaultMiner, "miner account of this node to receive block rewards")
 	runCmd.Flags().Uint64(flagPort, 8080, "The ip to run the client on")
 	runCmd.Flags().String(flagIP, "127.0.0.1", "The ip to run the client with")
+	runCmd.Flags().String(flagBootstrapIP, "127.0.0.1", "default bootstrap server to interconnect peers")
+	runCmd.Flags().Uint64(flagBootstrapPort, 8080, "default bootstrap server port to interconnect peers")
 	return runCmd
 }

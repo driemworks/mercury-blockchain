@@ -2,10 +2,12 @@ package node
 
 import (
 	"context"
-	"driemcoin/main/manifest"
 	"fmt"
+	"ftp2p/main/manifest"
 	"net/http"
 	"time"
+
+	"github.com/raphamorim/go-rainbow"
 )
 
 const endpointStatus = "/node/status"
@@ -19,7 +21,7 @@ const endpointAddPeerQueryKeyPort = "port"
 const endpointAddPeerQueryKeyMiner = "miner"
 
 func (n *Node) sync(ctx context.Context) error {
-	ticker := time.NewTicker(45 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	n.doSync()
 	for {
 		select {
@@ -38,12 +40,12 @@ func (n *Node) doSync() {
 			continue
 		}
 
-		fmt.Printf("Searching for new Peers and their Blocks and Peers: '%s'\n", peer.TcpAddress())
+		fmt.Printf("Searching for new Peers and their Blocks and Peers: '%s'\n", rainbow.Bold(rainbow.Green(peer.TcpAddress())))
 
 		status, err := queryPeerStatus(peer)
 		if err != nil {
 			fmt.Printf("ERROR: %s\n", err)
-			fmt.Printf("Peer '%s' was removed from KnownPeers\n", peer.TcpAddress())
+			fmt.Printf("Peer '%s' was removed from KnownPeers\n", rainbow.Bold(rainbow.Green(peer.TcpAddress())))
 
 			n.RemovePeer(peer)
 
@@ -99,13 +101,13 @@ func (n *Node) syncBlocks(peer PeerNode, status StatusResponse) error {
 	if localBlockNumber == 0 && status.Number == 0 {
 		newBlocksCount = 1
 	}
-	fmt.Printf("Found %d new blocks from Peer %s\n", newBlocksCount, peer.TcpAddress())
+	fmt.Printf("Found %d new blocks from Peer %s\n", newBlocksCount,
+		rainbow.Bold(rainbow.Green(peer.TcpAddress())))
 
 	blocks, err := fetchBlocksFromPeer(peer, n.state.LatestBlockHash())
 	if err != nil {
 		return err
 	}
-
 	for _, block := range blocks {
 		_, err = n.state.AddBlock(block)
 		if err != nil {
@@ -121,7 +123,7 @@ func (n *Node) syncBlocks(peer PeerNode, status StatusResponse) error {
 func (n *Node) syncKnownPeers(status StatusResponse) error {
 	for _, statusPeer := range status.KnownPeers {
 		if !n.IsKnownPeer(statusPeer) {
-			fmt.Printf("Found new Peer %s\n", statusPeer.TcpAddress())
+			fmt.Printf("Found new Peer %s\n", rainbow.Bold(rainbow.Green(statusPeer.TcpAddress())))
 
 			n.AddPeer(statusPeer)
 		}
@@ -131,7 +133,6 @@ func (n *Node) syncKnownPeers(status StatusResponse) error {
 }
 
 func (n *Node) syncPendingTXs(peer PeerNode, txs []manifest.SignedTx) error {
-	fmt.Println("Syncing pending transactions")
 	for _, tx := range txs {
 		err := n.AddPendingTX(tx, peer)
 		if err != nil {
@@ -177,7 +178,7 @@ func (n *Node) joinKnownPeers(peer PeerNode) error {
 	n.AddPeer(knownPeer)
 
 	if !addPeerRes.Success {
-		return fmt.Errorf("unable to join KnownPeers of '%s'", peer.TcpAddress())
+		return fmt.Errorf("unable to join KnownPeers of '%s'", rainbow.Bold(rainbow.Green(peer.TcpAddress())))
 	}
 
 	return nil
@@ -200,7 +201,7 @@ func queryPeerStatus(peer PeerNode) (StatusResponse, error) {
 }
 
 func fetchBlocksFromPeer(peer PeerNode, fromBlock manifest.Hash) ([]manifest.Block, error) {
-	fmt.Printf("Importing blocks from Peer %s...\n", peer.TcpAddress())
+	fmt.Printf("Importing blocks from Peer %s...\n", rainbow.Bold(rainbow.Green(peer.TcpAddress())))
 
 	url := fmt.Sprintf(
 		"http://%s%s?%s=%s",
