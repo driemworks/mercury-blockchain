@@ -1,10 +1,10 @@
 package node
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"ftp2p/main/logging"
 	"ftp2p/main/manifest"
 	"net/http"
 	"time"
@@ -13,8 +13,8 @@ import (
 	"github.com/raphamorim/go-rainbow"
 )
 
-// const httpPort = 8080
 const miningIntervalSeconds = 10
+const syncIntervalSeconds = 30
 
 type PeerNode struct {
 	IP          string         `json:"ip"`
@@ -91,9 +91,9 @@ func (n *Node) Run(ctx context.Context) error {
 	http.HandleFunc("/mailbox/send", func(w http.ResponseWriter, r *http.Request) {
 		addCIDHandler(w, r, n)
 	})
-	// send yourself some free coins....
+	// send tokens to an address
 	http.HandleFunc("/tokens", func(w http.ResponseWriter, r *http.Request) {
-		requestTokensHandler(w, r, n)
+		sendTokensHandler(w, r, n)
 	})
 	// get the nodes' status
 	http.HandleFunc("/node/status", func(w http.ResponseWriter, r *http.Request) {
@@ -219,13 +219,8 @@ func (n *Node) IsKnownPeer(peer PeerNode) bool {
 /**
 *
  */
-func (n *Node) AddPendingTX(tx manifest.SignedTx, fromPeer PeerNode) error {
+func (n *Node) AddPendingTX(tx manifest.SignedTx) error {
 	txHash, err := tx.Hash()
-	if err != nil {
-		return err
-	}
-
-	txJson, err := json.Marshal(tx)
 	if err != nil {
 		return err
 	}
@@ -234,15 +229,19 @@ func (n *Node) AddPendingTX(tx manifest.SignedTx, fromPeer PeerNode) error {
 	_, isArchived := n.archivedTXs[txHash.Hex()]
 
 	if !isAlreadyPending && !isArchived {
-		var prettyJSON bytes.Buffer
-		err = json.Indent(&prettyJSON, txJson, "", "\t\t")
+		txJSON, err := json.Marshal(tx)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Added Pending TX \n %s \n from Peer %s\n", string(prettyJSON.Bytes()), rainbow.Green(fromPeer.TcpAddress()))
+		prettyTxJSON, err := logging.PrettyPrintJSON(txJSON)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Adding pending transactions: \n%s\n", &prettyTxJSON)
+
 		n.pendingTXs[txHash.Hex()] = tx
 		n.newPendingTXs <- tx
-		// TODO - move this to new func
 		tmpFrom := n.state.Manifest[tx.From]
 		// if this is the first pending transaction
 		// TODO - checking if Sent is nil isn't a great thing.. should add a func to check if empty
@@ -250,8 +249,7 @@ func (n *Node) AddPendingTX(tx manifest.SignedTx, fromPeer PeerNode) error {
 		if tmpFrom.Sent == nil {
 			tmpFrom.Inbox = make([]manifest.InboxItem, 0)
 			tmpFrom.Sent = make([]manifest.SentItem, 0)
-			// TODO - this value should come from some external config?
-			tmpFrom.Balance = 1000
+			tmpFrom.Balance = manifest.BlockReward
 			tmpFrom.PendingBalance = tmpFrom.Balance
 		}
 		// TODO - the cost of the transaction is one coin for now, but should this always be the case?
@@ -259,19 +257,18 @@ func (n *Node) AddPendingTX(tx manifest.SignedTx, fromPeer PeerNode) error {
 		if tx.Amount > 0 {
 			tmpFrom.PendingBalance -= tx.Amount
 		}
-		// tmpFrom.Sent = append(tmpFrom.Sent, manifest.SentItem{tx.To, tx.CID, true, txHash})
 		n.state.Manifest[tx.From] = tmpFrom
-
+		// increase the account nonce => allows us to support mining blocks with multiple transactions
+		n.state.PendingAccount2Nonce[tx.From]++
 		tmpTo := n.state.Manifest[tx.To]
 		// if this is the first pending transaction, initialize data -> should this really happen this way? seems wrong...
 		if tmpTo.Inbox == nil {
 			tmpTo.Sent = make([]manifest.SentItem, 0)
 			tmpTo.Inbox = make([]manifest.InboxItem, 0)
-			tmpTo.Balance = 1000
+			tmpTo.Balance = manifest.BlockReward
 			tmpTo.PendingBalance = tmpTo.Balance
 		}
 		tmpTo.PendingBalance += tx.Amount
-		// tmpTo.Inbox = append(tmpTo.Inbox, manifest.InboxItem{tx.From, tx.CID, true, txHash})
 		n.state.Manifest[tx.To] = tmpTo
 	}
 	return nil
@@ -279,7 +276,6 @@ func (n *Node) AddPendingTX(tx manifest.SignedTx, fromPeer PeerNode) error {
 
 func (n *Node) getPendingTXsAsArray() []manifest.SignedTx {
 	txs := make([]manifest.SignedTx, len(n.pendingTXs))
-
 	i := 0
 	for _, tx := range n.pendingTXs {
 		txs[i] = tx

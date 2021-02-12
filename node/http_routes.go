@@ -120,7 +120,7 @@ func addCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		writeErrRes(w, err)
 		return
 	}
-	nonce := node.state.Account2Nonce[node.info.Address] + 1
+	nonce := node.state.PendingAccount2Nonce[node.info.Address] + 1
 	// TODO - the cost to send a cid is always 1?
 	// should this really go to the tx's to value, or to the 'system' (bootstrap) node?
 	tx := manifest.NewTx(from, manifest.NewAddress(req.To), manifest.NewCID(req.Cid), nonce, 1)
@@ -129,7 +129,7 @@ func addCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		writeErrRes(w, err)
 		return
 	}
-	err = node.AddPendingTX(signedTx, node.info)
+	err = node.AddPendingTX(signedTx)
 	if err != nil {
 		writeErrRes(w, err)
 		return
@@ -138,7 +138,7 @@ func addCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 }
 
 // host:port/tokens POST
-func requestTokensHandler(w http.ResponseWriter, r *http.Request, node *Node) {
+func sendTokensHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	req := sendTokensRequest{}
 	err := readReq(r, &req)
 	if err != nil {
@@ -150,7 +150,7 @@ func requestTokensHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		return
 	}
 	from := node.info.Address
-	nonce := node.state.Account2Nonce[node.info.Address] + 1
+	nonce := node.state.PendingAccount2Nonce[node.info.Address] + 1
 	tx := manifest.NewTx(from, manifest.NewAddress(req.To), manifest.NewCID(""), nonce, float32(req.Amount))
 	signedTx, err := wallet.SignTxWithKeystoreAccount(tx, from, req.FromPwd,
 		wallet.GetKeystoreDirPath(node.datadir))
@@ -158,7 +158,7 @@ func requestTokensHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		writeErrRes(w, err)
 		return
 	}
-	err = node.AddPendingTX(signedTx, node.info)
+	err = node.AddPendingTX(signedTx)
 	if err != nil {
 		writeErrRes(w, err)
 		return

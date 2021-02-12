@@ -21,7 +21,7 @@ const endpointAddPeerQueryKeyPort = "port"
 const endpointAddPeerQueryKeyMiner = "miner"
 
 func (n *Node) sync(ctx context.Context) error {
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(syncIntervalSeconds * time.Second)
 	n.doSync()
 	for {
 		select {
@@ -70,7 +70,7 @@ func (n *Node) doSync() {
 			continue
 		}
 
-		err = n.syncPendingTXs(peer, status.PendingTxs)
+		err = n.syncPendingTXs(status.PendingTxs)
 		if err != nil {
 			fmt.Printf("ERROR: %s\n", err)
 			continue
@@ -132,9 +132,9 @@ func (n *Node) syncKnownPeers(status StatusResponse) error {
 	return nil
 }
 
-func (n *Node) syncPendingTXs(peer PeerNode, txs []manifest.SignedTx) error {
+func (n *Node) syncPendingTXs(txs []manifest.SignedTx) error {
 	for _, tx := range txs {
-		err := n.AddPendingTX(tx, peer)
+		err := n.AddPendingTX(tx)
 		if err != nil {
 			return err
 		}

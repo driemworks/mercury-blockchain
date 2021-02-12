@@ -18,7 +18,10 @@ func getGenesisJsonFilePath(datadir string) string {
 	return filepath.Join(getDatabaseDirPath(datadir), "genesis.json")
 }
 
-func getBlocksDbFilePath(datadir string) string {
+func getBlocksDbFilePath(datadir string, isTemp bool) string {
+	if isTemp {
+		return filepath.Join(getDatabaseDirPath(datadir), "block.db.tmp")
+	}
 	return filepath.Join(getDatabaseDirPath(datadir), "block.db")
 }
 
@@ -35,7 +38,7 @@ func initDataDirIfNotExists(dataDir string) error {
 		return err
 	}
 
-	if err := writeEmptyBlocksDbToDisk(getBlocksDbFilePath(dataDir)); err != nil {
+	if err := writeEmptyBlocksDbToDisk(getBlocksDbFilePath(dataDir, false)); err != nil {
 		return err
 	}
 
@@ -94,6 +97,14 @@ func Unicode(s string) string {
 	return string(r)
 }
 
+func Rename(originalPath string, destinationPath string) error {
+	return os.Rename(originalPath, destinationPath)
+}
+
 func RemoveDir(path string) error {
 	return os.RemoveAll(path)
+}
+
+func writeGenesisToDisk(path string) error {
+	return ioutil.WriteFile(path, []byte(genesisJson), 0644)
 }

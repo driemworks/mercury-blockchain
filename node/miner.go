@@ -59,7 +59,7 @@ func Mine(ctx context.Context, pb PendingBlock) (manifest.Block, error) {
 			fmt.Printf("Mining "+rainbow.Magenta("%d")+" Pending TXs. Attempt: "+rainbow.Magenta("%d")+".\n", len(pb.txs), attempt)
 		}
 
-		block = manifest.NewBlock(pb.parent, pb.time, pb.number, pb.txs, nonce, pb.miner)
+		block = manifest.NewBlock(pb.parent, pb.time, pb.number, pb.txs, nonce, pb.miner, attempt)
 		blockHash, err := block.Hash()
 		if err != nil {
 			return manifest.Block{}, fmt.Errorf("couldn't mine block. %s", err.Error())
@@ -68,7 +68,7 @@ func Mine(ctx context.Context, pb PendingBlock) (manifest.Block, error) {
 		hash = blockHash
 	}
 
-	fmt.Printf("\nMined new Block '%x':\n", info(fmt.Sprint(hash)))
+	fmt.Printf("\nMined new Block '%v':\n", info(fmt.Sprint(hash)))
 	fmt.Printf("\tHeight: '%v'\n", info(fmt.Sprint(block.Header.Number)))
 	fmt.Printf("\tNonce: '%v'\n", info(fmt.Sprint(block.Header.Nonce)))
 	fmt.Printf("\tCreated: '%v'\n", info(fmt.Sprint(block.Header.Time)))

@@ -2,15 +2,18 @@ package manifest
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"fmt"
+	"ftp2p/main/logging"
 	"os"
 	"reflect"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/raphamorim/go-rainbow"
 )
+
+const BlockReward = float32(100)
 
 type CID string
 
@@ -34,13 +37,15 @@ type Manifest struct {
 }
 
 type State struct {
-	Manifest        map[common.Address]Manifest
-	Account2Nonce   map[common.Address]uint
-	txMempool       []Tx
-	latestBlock     Block
-	latestBlockHash Hash
-	dbFile          *os.File
-	hasGenesisBlock bool
+	Manifest             map[common.Address]Manifest
+	Account2Nonce        map[common.Address]uint
+	PendingAccount2Nonce map[common.Address]uint
+	txMempool            []Tx
+	latestBlock          Block
+	latestBlockHash      Hash
+	dbFile               *os.File
+	datadir              string
+	hasGenesisBlock      bool
 }
 
 /*
@@ -63,13 +68,14 @@ func NewStateFromDisk(datadir string) (*State, error) {
 		manifest[account] = Manifest{mailbox.Sent, mailbox.Inbox, mailbox.Balance, mailbox.PendingBalance}
 	}
 
-	blockDbFile, err := os.OpenFile(getBlocksDbFilePath(datadir), os.O_APPEND|os.O_RDWR, 0600)
+	blockDbFile, err := os.OpenFile(getBlocksDbFilePath(datadir, false), os.O_APPEND|os.O_RDWR, 0600)
 	if err != nil {
 		return nil, err
 	}
 	scanner := bufio.NewScanner(blockDbFile)
 	account2Nonce := make(map[common.Address]uint)
-	state := &State{manifest, account2Nonce, make([]Tx, 0), Block{}, Hash{}, blockDbFile, false}
+	pendingAccount2Nonce := make(map[common.Address]uint)
+	state := &State{manifest, account2Nonce, pendingAccount2Nonce, make([]Tx, 0), Block{}, Hash{}, blockDbFile, datadir, false}
 	for scanner.Scan() {
 		// handle scanner error
 		if err := scanner.Err(); err != nil {
@@ -83,7 +89,7 @@ func NewStateFromDisk(datadir string) (*State, error) {
 		if err := json.Unmarshal(blockFsJSON, &blockFs); err != nil {
 			return nil, err
 		}
-		if err = applyBlock(blockFs.Value, state); err != nil {
+		if err = ApplyBlock(blockFs.Value, state); err != nil {
 			return nil, err
 		}
 		state.latestBlock = blockFs.Value
@@ -96,7 +102,7 @@ func NewStateFromDisk(datadir string) (*State, error) {
 func (s *State) AddBlock(b Block) (Hash, error) {
 	pendingState := s.copy()
 
-	err := applyBlock(b, &pendingState)
+	err := ApplyBlock(b, &pendingState)
 	if err != nil {
 		return Hash{}, err
 	}
@@ -108,20 +114,16 @@ func (s *State) AddBlock(b Block) (Hash, error) {
 
 	blockFs := BlockFS{blockHash, b}
 
-	blockFsJson, err := json.Marshal(blockFs)
+	blockFsJSON, err := json.Marshal(blockFs)
 	if err != nil {
 		return Hash{}, err
 	}
 
-	var prettyJson bytes.Buffer
-	err = json.Indent(&prettyJson, blockFsJson, "", "\t")
-	if err != nil {
-		return Hash{}, err
-	}
+	prettyJSON, err := logging.PrettyPrintJSON(blockFsJSON)
 	fmt.Printf("Persisting new Block to disk:\n")
-	fmt.Printf("\t%s\n", &prettyJson)
+	fmt.Printf("\t%s\n", &prettyJSON)
 
-	_, err = s.dbFile.Write(append(blockFsJson, '\n'))
+	_, err = s.dbFile.Write(append(blockFsJSON, '\n'))
 	if err != nil {
 		return Hash{}, err
 	}
@@ -174,9 +176,9 @@ func applyTx(tx SignedTx, s *State) error {
 	if !ok {
 		return fmt.Errorf("bad Tx. Sender '%s' is forged", tx.From.String())
 	}
-
 	expectedNonce := s.Account2Nonce[tx.From] + 1
 	if tx.Nonce != expectedNonce {
+		// this is a possible case of another miner mining the same block!
 		return fmt.Errorf("bad Tx. next nonce must be '%d', not '%d'", expectedNonce, tx.Nonce)
 	}
 
@@ -201,9 +203,7 @@ func applyTx(tx SignedTx, s *State) error {
 		receipientMailbox.Inbox = append(receipientMailbox.Inbox, InboxItem{tx.From, tx.CID, txHash})
 	}
 	s.Manifest[tx.To] = receipientMailbox
-	tmp := s.Account2Nonce
-	tmp[tx.From] = tx.Nonce
-	s.Account2Nonce = tmp
+	s.Account2Nonce[tx.From] = tx.Nonce
 	return nil
 }
 
@@ -211,17 +211,63 @@ func NewCID(cid string) CID {
 	return CID(cid)
 }
 
-// applyBlock verifies if block can be added to the blockchain.
-//
-// Block metadata are verified as well as transactions within (sufficient balances, etc).
-func applyBlock(b Block, s *State) error {
+func ApplyBlock(b Block, s *State) error {
 	nextExpectedBlockNumber := s.latestBlock.Header.Number + 1
 
+	// if the incoming block was synced from a node that mined the same block before syncing
+	// then the incoming block could possibly contain the same transactions as the currently mined block
+	// TODO: what if the orphan block contains valid tx only partially not in the other block?
+	// get the node's latest block
+	// if s.latestBlock.Header.Number == b.Header.Number {
+	// 	fmt.Println(rainbow.Red("Encountered two blocks with the same block number"))
+	// 	// compare the pow of each block
+	// 	if s.latestBlock.Header.PoW < b.Header.PoW {
+	// 		fmt.Println("Reposessing mining reward. %s", rainbow.Bold(rainbow.Cyan("Sorry!")))
+	// 		// 1) copy all but last line of block.db to block.db.tmp
+	// 		// 2) rename block.db.tmp to block.db
+	// 		// 3) rebuild state
+	// 		// 4) create the (empty) tmp file
+	// 		s.orphanLatestBlock()
+	// 		newState, err := NewStateFromDisk(s.datadir)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		// will this work? ... let's find out
+	// 		s = newState
+	// 		// now can we just restart the node?
+	// 		fmt.Printf(rainbow.Magenta("Successfully orphaned latest block"))
+	// 	} else {
+	// 		return fmt.Errorf("encountered invalid block. Rejecting it from the blockchain")
+	// 	}
+	// } else
 	if s.hasGenesisBlock && b.Header.Number != nextExpectedBlockNumber {
-		return fmt.Errorf("next expected block number must be '%d' not '%d'", nextExpectedBlockNumber, b.Header.Number)
-	}
+		// scenario: we mined the same block as the incoming block
+		//			1) check if they're the same block
+		latestBlockHash, err := s.latestBlock.Hash()
+		if err != nil {
+			return err
+		}
+		blockHash, err := b.Hash()
+		if err != nil {
+			return err
+		}
+		if latestBlockHash == blockHash {
+			// they're the same block! compare the Proof of Work  of both blocks
+			// block with greatest pow is added to blocks other block is orphaned or ignored
+			if s.latestBlock.Header.PoW < b.Header.PoW {
+				s.orphanLatestBlock()
+				s, err = NewStateFromDisk(s.datadir)
+				if err != nil {
+					return err
+				}
+			} else {
+				return fmt.Errorf("next expected block number must be '%d' not '%d'", nextExpectedBlockNumber, b.Header.Number)
+			}
 
-	if s.hasGenesisBlock && s.latestBlock.Header.Number > 0 && !reflect.DeepEqual(b.Header.Parent, s.latestBlockHash) {
+		} else {
+			return fmt.Errorf("next expected block number must be '%d' not '%d'", nextExpectedBlockNumber, b.Header.Number)
+		}
+	} else if s.hasGenesisBlock && s.latestBlock.Header.Number > 0 && !reflect.DeepEqual(b.Header.Parent, s.latestBlockHash) {
 		return fmt.Errorf("next block parent hash must be '%x' not '%x'", s.latestBlockHash, b.Header.Parent)
 	}
 
@@ -230,19 +276,51 @@ func applyBlock(b Block, s *State) error {
 		return err
 	}
 	if !IsBlockHashValid(hash) {
-		return fmt.Errorf("Invalid block hash")
+		return fmt.Errorf(rainbow.Red("Invalid block hash %x"), hash)
 	}
 	err = applyTXs(b.TXs, s)
 	if err != nil {
 		return err
 	}
-
-	// reward 100 each time a tx is mined... does this seem like an excessive amount?
 	tmp := s.Manifest[b.Header.Miner]
-	tmp.Balance += 1000
-	tmp.PendingBalance += 1000
+	tmp.Balance += BlockReward
+	tmp.PendingBalance += BlockReward
 	s.Manifest[b.Header.Miner] = tmp
 
+	return nil
+}
+
+func (s *State) orphanLatestBlock() error {
+	writeEmptyBlocksDbToDisk(getBlocksDbFilePath(s.datadir, true))
+	tempDbFile, err := os.OpenFile(getBlocksDbFilePath(s.datadir, true), os.O_APPEND|os.O_RDWR, 0600)
+	// ioutil.WriteFile(getBlocksDbFilePath(s.datadir, true), []byte(""), os.ModePerm)
+	blockDbFile, err := os.OpenFile(s.dbFile.Name(), os.O_APPEND|os.O_RDWR, 0600)
+	if err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(blockDbFile)
+	for scanner.Scan() {
+		// handle scanner error
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+		blockFsJSON := scanner.Bytes()
+		if len(blockFsJSON) == 0 {
+			break
+		}
+		var blockFs BlockFS
+		if err := json.Unmarshal(blockFsJSON, &blockFs); err != nil {
+			return err
+		}
+		// if the block's number equals the input block's number, then do nothing
+		if blockFs.Value.Header.Number < s.latestBlock.Header.Number {
+			tempDbFile.Write(append(blockFsJSON, '\n'))
+		}
+	}
+	err = Rename(tempDbFile.Name(), blockDbFile.Name())
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -283,7 +361,8 @@ func (s *State) copy() State {
 }
 
 func GetBlocksAfter(blockHash Hash, dataDir string) ([]Block, error) {
-	f, err := os.OpenFile(getBlocksDbFilePath(dataDir), os.O_RDONLY, 0600)
+	// open block.db
+	f, err := os.OpenFile(getBlocksDbFilePath(dataDir, false), os.O_RDONLY, 0600)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +370,10 @@ func GetBlocksAfter(blockHash Hash, dataDir string) ([]Block, error) {
 	blocks := make([]Block, 0)
 	shouldStartCollecting := false
 
+	// if blockhash is empty, start collecting (i.e. append to blocks)
+	// won't this always be true...? I hope...
 	if reflect.DeepEqual(blockHash, Hash{}) {
+		fmt.Println("shouldStartCollecting = true")
 		shouldStartCollecting = true
 	}
 
@@ -315,6 +397,11 @@ func GetBlocksAfter(blockHash Hash, dataDir string) ([]Block, error) {
 		if blockHash == blockFs.Key {
 			shouldStartCollecting = true
 		}
+	}
+
+	if reflect.DeepEqual(blockHash, Hash{}) {
+		fmt.Println("Ummm wait... we never found my block... that's weird")
+		fmt.Println("I wonder if there could be another block with the same block number")
 	}
 
 	return blocks, nil

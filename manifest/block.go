@@ -41,6 +41,7 @@ type BlockHeader struct {
 	Number uint64         `json:"number"`
 	Nonce  uint32         `json:"nonce"`
 	Miner  common.Address `json:"miner"`
+	PoW    int            `json:"proof_of_work"`
 }
 
 type BlockFS struct {
@@ -63,8 +64,8 @@ func (b *Block) Hash() (Hash, error) {
 /*
 	NewBlock
 */
-func NewBlock(parent Hash, time uint64, number uint64, txs []SignedTx, nonce uint32, miner common.Address) Block {
-	return Block{BlockHeader{parent, time, number, nonce, miner}, txs}
+func NewBlock(parent Hash, time uint64, number uint64, txs []SignedTx, nonce uint32, miner common.Address, pow int) Block {
+	return Block{BlockHeader{parent, time, number, nonce, miner, pow}, txs}
 }
 
 /*
@@ -72,9 +73,10 @@ func NewBlock(parent Hash, time uint64, number uint64, txs []SignedTx, nonce uin
 */
 func IsBlockHashValid(hash Hash) bool {
 	return fmt.Sprintf("%x", hash[0]) == "1" &&
-		fmt.Sprintf("%x", hash[1]) == "0" &&
-		fmt.Sprintf("%x", hash[2]) == "1"
+		fmt.Sprintf("%x", hash[1]) == "0"
+	//  &&
+	// fmt.Sprintf("%x", hash[2]) == "1"
 	// &&
-	// fmt.Sprintf("%x", hash[3]) != "0"
+	// 	fmt.Sprintf("%x", hash[3]) != "0"
 
 }
