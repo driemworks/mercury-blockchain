@@ -15,18 +15,23 @@ import (
 
 const BlockReward = float32(100)
 
-type CID string
+type CID struct {
+	CID         string `json:"cid"`
+	IPFSGateway string `json:"ipfs_gateway"`
+}
 
 type SentItem struct {
-	To   common.Address `json:"to"`
-	CID  CID            `json:"cid"`
-	Hash Hash           `json:"hash"`
+	To     common.Address `json:"to"`
+	CID    CID            `json:"cid"`
+	Hash   Hash           `json:"hash"`
+	Amount float32        `json:"amount"`
 }
 
 type InboxItem struct {
-	From common.Address `json:"from"`
-	CID  CID            `json:"cid"`
-	Hash Hash           `json:"hash"`
+	From   common.Address `json:"from"`
+	CID    CID            `json:"cid"`
+	Hash   Hash           `json:"hash"`
+	Amount float32        `json:"amount"`
 }
 
 type Manifest struct {
@@ -75,7 +80,7 @@ func NewStateFromDisk(datadir string) (*State, error) {
 	scanner := bufio.NewScanner(blockDbFile)
 	account2Nonce := make(map[common.Address]uint)
 	pendingAccount2Nonce := make(map[common.Address]uint)
-	state := &State{manifest, account2Nonce, pendingAccount2Nonce, make([]Tx, 0), Block{}, Hash{}, blockDbFile, datadir, false}
+	state := &State{manifest, account2Nonce, pendingAccount2Nonce, make([]Tx, 0), Block{}, Hash{}, blockDbFile, datadir, true}
 	for scanner.Scan() {
 		// handle scanner error
 		if err := scanner.Err(); err != nil {
@@ -94,13 +99,16 @@ func NewStateFromDisk(datadir string) (*State, error) {
 		}
 		state.latestBlock = blockFs.Value
 		state.latestBlockHash = blockFs.Key
-		state.hasGenesisBlock = true
 	}
 	return state, nil
 }
 
 func (s *State) AddBlock(b Block) (Hash, error) {
 	pendingState := s.copy()
+	// if it's the parent hash, do nothing
+	if b.Header.Number == s.latestBlock.Header.Number-1 {
+		return Hash{}, nil
+	}
 
 	err := ApplyBlock(b, &pendingState)
 	if err != nil {
@@ -192,74 +200,50 @@ func applyTx(tx SignedTx, s *State) error {
 	}
 
 	var senderMailbox = s.Manifest[tx.From]
-	senderMailbox.Sent = append(senderMailbox.Sent, SentItem{tx.To, tx.CID, txHash})
+	senderMailbox.Sent = append(senderMailbox.Sent, SentItem{tx.To, tx.CID, txHash, tx.Amount})
 	senderMailbox.Balance = senderMailbox.PendingBalance
 	s.Manifest[tx.From] = senderMailbox
 	// update recipient inbox items
 	var receipientMailbox = s.Manifest[tx.To]
-	receipientMailbox.Balance = receipientMailbox.PendingBalance
+	fmt.Printf("updating recipient's balance from %x to %x", receipientMailbox.Balance, receipientMailbox.Balance+tx.Amount)
+	receipientMailbox.Balance += tx.Amount
 	// add a new inbox item if there is a CID
-	if tx.CID != NewCID("") {
-		receipientMailbox.Inbox = append(receipientMailbox.Inbox, InboxItem{tx.From, tx.CID, txHash})
+	if !tx.CID.IsEmpty() {
+		receipientMailbox.Inbox = append(receipientMailbox.Inbox, InboxItem{tx.From, tx.CID, txHash, tx.Amount})
 	}
 	s.Manifest[tx.To] = receipientMailbox
 	s.Account2Nonce[tx.From] = tx.Nonce
 	return nil
 }
 
-func NewCID(cid string) CID {
-	return CID(cid)
+func (c *CID) IsEmpty() bool {
+	return len(c.CID) == 0
+}
+
+func NewCID(cid string, gateway string) CID {
+	return CID{cid, gateway}
 }
 
 func ApplyBlock(b Block, s *State) error {
 	nextExpectedBlockNumber := s.latestBlock.Header.Number + 1
-
-	// if the incoming block was synced from a node that mined the same block before syncing
-	// then the incoming block could possibly contain the same transactions as the currently mined block
-	// TODO: what if the orphan block contains valid tx only partially not in the other block?
-	// get the node's latest block
-	// if s.latestBlock.Header.Number == b.Header.Number {
-	// 	fmt.Println(rainbow.Red("Encountered two blocks with the same block number"))
-	// 	// compare the pow of each block
-	// 	if s.latestBlock.Header.PoW < b.Header.PoW {
-	// 		fmt.Println("Reposessing mining reward. %s", rainbow.Bold(rainbow.Cyan("Sorry!")))
-	// 		// 1) copy all but last line of block.db to block.db.tmp
-	// 		// 2) rename block.db.tmp to block.db
-	// 		// 3) rebuild state
-	// 		// 4) create the (empty) tmp file
-	// 		s.orphanLatestBlock()
-	// 		newState, err := NewStateFromDisk(s.datadir)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		// will this work? ... let's find out
-	// 		s = newState
-	// 		// now can we just restart the node?
-	// 		fmt.Printf(rainbow.Magenta("Successfully orphaned latest block"))
-	// 	} else {
-	// 		return fmt.Errorf("encountered invalid block. Rejecting it from the blockchain")
-	// 	}
-	// } else
 	if s.hasGenesisBlock && b.Header.Number != nextExpectedBlockNumber {
 		// scenario: we mined the same block as the incoming block
-		//			1) check if they're the same block
-		latestBlockHash, err := s.latestBlock.Hash()
-		if err != nil {
-			return err
-		}
-		blockHash, err := b.Hash()
-		if err != nil {
-			return err
-		}
-		if latestBlockHash == blockHash {
-			// they're the same block! compare the Proof of Work  of both blocks
+		//			1) check if b and s.latestBlock are the same block (same block number -> should check tx too maybe?)
+		if s.latestBlock.Header.Number == b.Header.Number {
+			bHash, err := b.Hash()
+			if err != nil {
+				return err
+			}
+			fmt.Printf("the block's hash is %x", rainbow.Bold(rainbow.BgMagenta(fmt.Sprint(bHash))))
+			// are they the same block? compare the Proof of Work  of both blocks
 			// block with greatest pow is added to blocks other block is orphaned or ignored
 			if s.latestBlock.Header.PoW < b.Header.PoW {
 				s.orphanLatestBlock()
-				s, err = NewStateFromDisk(s.datadir)
+				s, err := NewStateFromDisk(s.datadir)
 				if err != nil {
 					return err
 				}
+				fmt.Printf("Reloaded state. Latest blockhash is: %x", rainbow.Yellow(fmt.Sprint(s.latestBlockHash)))
 			} else {
 				return fmt.Errorf("next expected block number must be '%d' not '%d'", nextExpectedBlockNumber, b.Header.Number)
 			}
@@ -282,6 +266,7 @@ func ApplyBlock(b Block, s *State) error {
 	if err != nil {
 		return err
 	}
+	fmt.Printf("Giving block reward to %x", rainbow.Yellow(b.Header.Miner.Hex()))
 	tmp := s.Manifest[b.Header.Miner]
 	tmp.Balance += BlockReward
 	tmp.PendingBalance += BlockReward
@@ -366,14 +351,9 @@ func GetBlocksAfter(blockHash Hash, dataDir string) ([]Block, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	blocks := make([]Block, 0)
 	shouldStartCollecting := false
-
-	// if blockhash is empty, start collecting (i.e. append to blocks)
-	// won't this always be true...? I hope...
 	if reflect.DeepEqual(blockHash, Hash{}) {
-		fmt.Println("shouldStartCollecting = true")
 		shouldStartCollecting = true
 	}
 
@@ -397,11 +377,6 @@ func GetBlocksAfter(blockHash Hash, dataDir string) ([]Block, error) {
 		if blockHash == blockFs.Key {
 			shouldStartCollecting = true
 		}
-	}
-
-	if reflect.DeepEqual(blockHash, Hash{}) {
-		fmt.Println("Ummm wait... we never found my block... that's weird")
-		fmt.Println("I wonder if there could be another block with the same block number")
 	}
 
 	return blocks, nil

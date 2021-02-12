@@ -80,7 +80,6 @@ func (n *Node) doSync() {
 
 func (n *Node) syncBlocks(peer PeerNode, status StatusResponse) error {
 	localBlockNumber := n.state.LatestBlock().Header.Number
-
 	// If the peer has no blocks, ignore it
 	if status.Hash.IsEmpty() {
 		return nil
@@ -101,10 +100,15 @@ func (n *Node) syncBlocks(peer PeerNode, status StatusResponse) error {
 	if localBlockNumber == 0 && status.Number == 0 {
 		newBlocksCount = 1
 	}
-	fmt.Printf("Found %d new blocks from Peer %s\n", newBlocksCount,
-		rainbow.Bold(rainbow.Green(peer.TcpAddress())))
+	if newBlocksCount > 1 {
+		fmt.Printf("Found %d new blocks from Peer %s\n", newBlocksCount,
+			rainbow.Bold(rainbow.Green(peer.TcpAddress())))
+	}
 
-	blocks, err := fetchBlocksFromPeer(peer, n.state.LatestBlockHash())
+	blockHash := n.state.LatestBlockHash()
+	// retrieve the latest block from the parent block (so if all goes well the first block is the same block we have)
+	blocks, err := fetchBlocksFromPeer(peer, blockHash)
+	// remove first block? (parent) what's the best way??
 	if err != nil {
 		return err
 	}

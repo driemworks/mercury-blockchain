@@ -63,6 +63,7 @@ type userMailboxResponse struct {
 type cidAddRequest struct {
 	To      string `json:"to"`
 	Cid     string `json:"cid"`
+	Gateway string `json:"gateway"`
 	FromPwd string `json:"from_pwd"`
 }
 
@@ -123,7 +124,7 @@ func addCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	nonce := node.state.PendingAccount2Nonce[node.info.Address] + 1
 	// TODO - the cost to send a cid is always 1?
 	// should this really go to the tx's to value, or to the 'system' (bootstrap) node?
-	tx := manifest.NewTx(from, manifest.NewAddress(req.To), manifest.NewCID(req.Cid), nonce, 1)
+	tx := manifest.NewTx(from, manifest.NewAddress(req.To), manifest.NewCID(req.Cid, req.Gateway), nonce, 1)
 	signedTx, err := wallet.SignTxWithKeystoreAccount(tx, node.info.Address, req.FromPwd, wallet.GetKeystoreDirPath(node.datadir))
 	if err != nil {
 		writeErrRes(w, err)
@@ -151,7 +152,7 @@ func sendTokensHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	}
 	from := node.info.Address
 	nonce := node.state.PendingAccount2Nonce[node.info.Address] + 1
-	tx := manifest.NewTx(from, manifest.NewAddress(req.To), manifest.NewCID(""), nonce, float32(req.Amount))
+	tx := manifest.NewTx(from, manifest.NewAddress(req.To), manifest.NewCID("", ""), nonce, float32(req.Amount))
 	signedTx, err := wallet.SignTxWithKeystoreAccount(tx, from, req.FromPwd,
 		wallet.GetKeystoreDirPath(node.datadir))
 	if err != nil {

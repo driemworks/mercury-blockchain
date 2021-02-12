@@ -163,6 +163,7 @@ func (n *Node) mine(ctx context.Context) error {
 }
 
 func (n *Node) minePendingTXs(ctx context.Context) error {
+	fmt.Printf("MINING PENDING TXs = next block num is %d\n", n.state.NextBlockNumber())
 	blockToMine := NewPendingBlock(
 		n.state.LatestBlockHash(),
 		n.state.NextBlockNumber(),
@@ -249,8 +250,8 @@ func (n *Node) AddPendingTX(tx manifest.SignedTx) error {
 		if tmpFrom.Sent == nil {
 			tmpFrom.Inbox = make([]manifest.InboxItem, 0)
 			tmpFrom.Sent = make([]manifest.SentItem, 0)
-			tmpFrom.Balance = manifest.BlockReward
-			tmpFrom.PendingBalance = tmpFrom.Balance
+			// tmpFrom.Balance += manifest.BlockReward
+			// tmpFrom.PendingBalance += tmpFrom.Balance
 		}
 		// TODO - the cost of the transaction is one coin for now, but should this always be the case?
 		//         could file size factor into the cost? -> maybe when I get to the concept of gas?
@@ -265,8 +266,8 @@ func (n *Node) AddPendingTX(tx manifest.SignedTx) error {
 		if tmpTo.Inbox == nil {
 			tmpTo.Sent = make([]manifest.SentItem, 0)
 			tmpTo.Inbox = make([]manifest.InboxItem, 0)
-			tmpTo.Balance = manifest.BlockReward
-			tmpTo.PendingBalance = tmpTo.Balance
+			// tmpTo.Balance += manifest.BlockReward
+			// tmpTo.PendingBalance += tmpTo.Balance
 		}
 		tmpTo.PendingBalance += tx.Amount
 		n.state.Manifest[tx.To] = tmpTo
