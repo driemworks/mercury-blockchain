@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"ftp2p/main/logging"
+	"ftp2p/logging"
 	"os"
 	"reflect"
 	"sort"

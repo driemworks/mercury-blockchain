@@ -9,10 +9,10 @@ import (
 
 var genesisJson = `
 {
-    "genesis_time": "2021-02-07T00:00:00.000000000Z",
+    "genesis_time": "2021-02-012T00:00:00.000000000Z",
     "chain_id": "driemworks-blockchain",
     "manifest": {
-        "0x11494645b11e185ade0906d3a5f6b37b72a6c8dc": {
+        "0x5e79986470914df6Cf60a232dE6761Bc862914c5": {
 			"alias": "tony",
             "sent": [],
             "inbox": [],

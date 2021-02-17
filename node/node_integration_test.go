@@ -2,7 +2,7 @@ package node
 
 import (
 	"context"
-	"ftp2p/main/manifest"
+	"ftp2p/manifest"
 	"os"
 	"path/filepath"
 	"testing"

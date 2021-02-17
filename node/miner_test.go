@@ -3,7 +3,7 @@ package node
 import (
 	"context"
 	"encoding/hex"
-	"ftp2p/main/manifest"
+	"ftp2p/manifest"
 	"testing"
 	"time"
 
@@ -64,7 +64,7 @@ func TestMineWithTimeout(t *testing.T) {
 
 func createRandomPendingBlock(miner common.Address) PendingBlock {
 	return NewPendingBlock(manifest.Hash{}, 0, miner, []manifest.SignedTx{
-		{manifest.Tx{From: manifest.NewAddress("to0ny"), To: manifest.NewAddress("theo"), CID: manifest.NewCID("")}, []byte{}},
+		{manifest.Tx{From: manifest.NewAddress("tony"), To: manifest.NewAddress("theo"), CID: manifest.NewCID("", "")}, []byte{}},
 	},
 	)
 }

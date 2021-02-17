@@ -17,6 +17,13 @@ File Transfer: Peer-to-Peer is a blockchain to facilitate sharing of data via IP
       - -- port: the port of the ftp2p node
   - version: Display the current CLI version
 
+  ex:
+  ```
+  ftp2p wallet new-address --datadir=./.ftp2p
+  >  0x...
+  ftp2p run --datadir=./.ftp2p --alias=tony --miner=0x... --port=8080
+  ```
+
 ### API
 
 ### Local Setup

@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"ftp2p/main/logging"
-	"ftp2p/main/manifest"
+	"ftp2p/logging"
+	"ftp2p/manifest"
+	"ftp2p/wallet"
 	"net/http"
 	"time"
 
@@ -41,6 +42,7 @@ type Node struct {
 	newPendingTXs   chan manifest.SignedTx
 	isMining        bool
 	alias           string
+	wallet          wallet.Wallet
 }
 
 func NewNode(alias string, datadir string, ip string, port uint64, address common.Address, boostrap PeerNode) *Node {
@@ -83,7 +85,7 @@ func (n *Node) Run(ctx context.Context) error {
 	go n.sync(ctx)
 	go n.mine(ctx)
 
-	// list manifest
+	// list manifest (for yourself)
 	http.HandleFunc("/mailbox", func(w http.ResponseWriter, r *http.Request) {
 		viewMailboxHandler(w, r, n)
 	})
@@ -94,6 +96,14 @@ func (n *Node) Run(ctx context.Context) error {
 	// send tokens to an address
 	http.HandleFunc("/tokens", func(w http.ResponseWriter, r *http.Request) {
 		sendTokensHandler(w, r, n)
+	})
+	// encrypt some data
+	http.HandleFunc("/encrypt", func(w http.ResponseWriter, r *http.Request) {
+		encryptDataHandler(w, r, n)
+	})
+	// decrypt some data
+	http.HandleFunc("/decrypt", func(w http.ResponseWriter, r *http.Request) {
+		decryptDataHandler(w, r, n)
 	})
 	// get the nodes' status
 	http.HandleFunc("/node/status", func(w http.ResponseWriter, r *http.Request) {

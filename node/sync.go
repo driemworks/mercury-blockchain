@@ -3,7 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
-	"ftp2p/main/manifest"
+	"ftp2p/manifest"
 	"net/http"
 	"time"
 

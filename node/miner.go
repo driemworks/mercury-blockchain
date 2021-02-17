@@ -3,7 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
-	"ftp2p/main/manifest"
+	"ftp2p/manifest"
 	"math/rand"
 	"time"
 

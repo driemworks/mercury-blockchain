@@ -2,8 +2,8 @@ package node
 
 import (
 	"fmt"
-	"ftp2p/main/manifest"
-	"ftp2p/main/wallet"
+	"ftp2p/manifest"
+	"ftp2p/wallet"
 	"net/http"
 	"strconv"
 
@@ -71,6 +71,25 @@ type cidAddResponse struct {
 	Success bool `json:"success"`
 }
 
+type encryptDataRequest struct {
+	Data    string `json:"data"` // doing this for now, change to multipart upload later
+	To      string `json:"to"`
+	FromPwd string `json:"from_pwd"`
+}
+
+type EncryptDataResponse struct {
+	EncryptedData *wallet.EncryptedData `json:"encrypted_data"`
+}
+
+type DecryptDataRequest struct {
+	EncryptedData wallet.EncryptedData `json:"encrypted_data"`
+	FromPwd       string               `json:"from_pwd"`
+}
+
+type DecryptDataResponse struct {
+	Data string `json:"data"`
+}
+
 /**
 * List the manifest
  */
@@ -96,6 +115,10 @@ func addCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	err := readReq(r, &req)
 	if err != nil {
 		writeErrRes(w, err)
+		return
+	}
+	setupResponse(&w, r)
+	if (*r).Method == "OPTIONS" {
 		return
 	}
 	// safe to assume 'from' is a valid address
@@ -125,7 +148,8 @@ func addCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	// TODO - the cost to send a cid is always 1?
 	// should this really go to the tx's to value, or to the 'system' (bootstrap) node?
 	tx := manifest.NewTx(from, manifest.NewAddress(req.To), manifest.NewCID(req.Cid, req.Gateway), nonce, 1)
-	signedTx, err := wallet.SignTxWithKeystoreAccount(tx, node.info.Address, req.FromPwd, wallet.GetKeystoreDirPath(node.datadir))
+	signedTx, err := wallet.SignTxWithKeystoreAccount(
+		tx, node.info.Address, req.FromPwd, wallet.GetKeystoreDirPath(node.datadir))
 	if err != nil {
 		writeErrRes(w, err)
 		return
@@ -144,6 +168,10 @@ func sendTokensHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	err := readReq(r, &req)
 	if err != nil {
 		writeErrRes(w, err)
+		return
+	}
+	setupResponse(&w, r)
+	if (*r).Method == "OPTIONS" {
 		return
 	}
 	if req.Amount <= 0 {
@@ -165,6 +193,51 @@ func sendTokensHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		return
 	}
 	writeRes(w, TokenRequestResponse{Success: true, Amount: req.Amount})
+}
+
+func encryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
+	req := encryptDataRequest{}
+	err := readReq(r, &req)
+	if err != nil {
+		writeErrRes(w, err)
+		return
+	}
+	// needed?
+	setupResponse(&w, r)
+	if (*r).Method == "OPTIONS" {
+		return
+	}
+	encryptedData, err := wallet.Encrypt(
+		wallet.GetEncryptionPublicKey(req.To),
+		[]byte(req.Data),
+		wallet.X25519,
+	)
+	if err != nil {
+		writeErrRes(w, err)
+		return
+	}
+	writeRes(w, EncryptDataResponse{EncryptedData: encryptedData})
+}
+
+func decryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
+	req := DecryptDataRequest{}
+	err := readReq(r, &req)
+	if err != nil {
+		writeErrRes(w, err)
+		return
+	}
+	decryptedData, err := wallet.Decrypt(
+		wallet.GetKeystoreDirPath(node.datadir),
+		node.info.Address,
+		req.FromPwd,
+		&req.EncryptedData,
+	)
+	if err != nil {
+		writeErrRes(w, err)
+		return
+	}
+	fmt.Printf("the decrypted data is %x", len(decryptedData))
+	writeRes(w, DecryptDataResponse{string(decryptedData)})
 }
 
 /**

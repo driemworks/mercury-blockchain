@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"ftp2p/main/manifest"
-	"ftp2p/main/node"
+	"ftp2p/manifest"
+	"ftp2p/node"
 	"os"
 
 	"github.com/raphamorim/go-rainbow"
@@ -43,7 +43,7 @@ func runCmd() *cobra.Command {
 				bootstrapIP,
 				bootstrapPort,
 				true,
-				manifest.NewAddress(""), // is this even really needed...?
+				manifest.NewAddress("0x5e79986470914df6Cf60a232dE6761Bc862914c5"),
 				false,
 			)
 			n := node.NewNode(alias, getDataDirFromCmd(cmd), ip, port,

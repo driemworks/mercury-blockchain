@@ -2,15 +2,14 @@ package main
 
 import (
 	"fmt"
+	"ftp2p/wallet"
 	"io/ioutil"
 	"os"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/cmd/utils"
-	"github.com/ethereum/go-ethereum/console"
 	"github.com/spf13/cobra"
-	"github.com/web3coach/the-blockchain-bar/wallet"
 )
 
 func walletCmd() *cobra.Command {
@@ -83,17 +82,16 @@ func walletPrintPrivKeyCmd() *cobra.Command {
 	return cmd
 }
 
+// TODO  this is a bit broken...
 func getPassPhrase(prompt string, confirmation bool) string {
-	password, err := console.Stdin.PromptPassword(prompt)
-	if err != nil {
-		utils.Fatalf("Failed to read password: %v", err)
-	}
+	fmt.Print(prompt)
+	var password string
+	fmt.Scanln(&password)
 	if confirmation {
-		confirm, err := console.Stdin.PromptPassword("Repeat password: ")
-		if err != nil {
-			utils.Fatalf("Failed to read password confirmation: %v", err)
-		}
-		if password != confirm {
+		fmt.Print("Repeat password: ")
+		var confirmationPassword string
+		fmt.Scanln(&confirmationPassword)
+		if password != confirmationPassword {
 			utils.Fatalf("Password should match")
 		}
 	}

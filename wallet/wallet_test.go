@@ -5,6 +5,8 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
+	"ftp2p/manifest"
+	"io/ioutil"
 	"math/big"
 	"testing"
 
@@ -99,78 +101,78 @@ func TestSign(t *testing.T) {
 	}
 }
 
-// func TestSignTxWithKeystoreAccount(t *testing.T) {
-// 	tmpDir, err := ioutil.TempDir("", "wallet_test")
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	defer fs.RemoveDir(tmpDir)
+func TestSignTxWithKeystoreAccount(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "wallet_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manifest.RemoveDir(tmpDir)
 
-// 	andrej, err := NewKeystoreAccount(tmpDir, testKeystoreAccountsPwd)
-// 	if err != nil {
-// 		t.Error(err)
-// 		return
-// 	}
+	andrej, err := NewKeystoreAccount(tmpDir, testKeystoreAccountsPwd)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-// 	babaYaga, err := NewKeystoreAccount(tmpDir, testKeystoreAccountsPwd)
-// 	if err != nil {
-// 		t.Error(err)
-// 		return
-// 	}
+	babaYaga, err := NewKeystoreAccount(tmpDir, testKeystoreAccountsPwd)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-// 	tx := manifest.NewTx(manifest.NewAddress("test"), manifest.NewAddress("test2"), manifest.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH"), "")
+	tx := manifest.NewTx(manifest.NewAddress("test"), manifest.NewAddress("test2"), manifest.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", ""), 0, 0)
 
-// 	signedTx, err := SignTxWithKeystoreAccount(tx, andrej, testKeystoreAccountsPwd, GetKeystoreDirPath(tmpDir))
-// 	if err != nil {
-// 		t.Error(err)
-// 		return
-// 	}
+	signedTx, err := SignTxWithKeystoreAccount(tx, andrej, testKeystoreAccountsPwd, GetKeystoreDirPath(tmpDir))
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-// 	ok, err := signedTx.IsAuthentic()
-// 	if err != nil {
-// 		t.Error(err)
-// 		return
-// 	}
+	ok, err := signedTx.IsAuthentic()
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-// 	if !ok {
-// 		t.Fatal("the TX was signed by 'from' account and should have been authentic")
-// 	}
-// }
+	if !ok {
+		t.Fatal("the TX was signed by 'from' account and should have been authentic")
+	}
+}
 
-// func TestSignForgedTxWithKeystoreAccount(t *testing.T) {
-// 	tmpDir, err := ioutil.TempDir("", "wallet_test")
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	defer fs.RemoveDir(tmpDir)
+func TestSignForgedTxWithKeystoreAccount(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "wallet_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manifest.RemoveDir(tmpDir)
 
-// 	hacker, err := NewKeystoreAccount(tmpDir, testKeystoreAccountsPwd)
-// 	if err != nil {
-// 		t.Error(err)
-// 		return
-// 	}
+	hacker, err := NewKeystoreAccount(tmpDir, testKeystoreAccountsPwd)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-// 	babaYaga, err := NewKeystoreAccount(tmpDir, testKeystoreAccountsPwd)
-// 	if err != nil {
-// 		t.Error(err)
-// 		return
-// 	}
+	babaYaga, err := NewKeystoreAccount(tmpDir, testKeystoreAccountsPwd)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-// 	forgedTx := database.NewTx(babaYaga, hacker, 100, 1, "")
+	forgedTx := manifest.NewTx(babaYaga, hacker, manifest.NewCID("", ""), 1, 1)
 
-// 	signedTx, err := SignTxWithKeystoreAccount(forgedTx, hacker, testKeystoreAccountsPwd, GetKeystoreDirPath(tmpDir))
-// 	if err != nil {
-// 		t.Error(err)
-// 		return
-// 	}
+	signedTx, err := SignTxWithKeystoreAccount(forgedTx, hacker, testKeystoreAccountsPwd, GetKeystoreDirPath(tmpDir))
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-// 	ok, err := signedTx.IsAuthentic()
-// 	if err != nil {
-// 		t.Error(err)
-// 		return
-// 	}
+	ok, err := signedTx.IsAuthentic()
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-// 	if ok {
-// 		t.Fatal("the TX 'from' attribute was forged and should have not be authentic")
-// 	}
-// }
+	if ok {
+		t.Fatal("the TX 'from' attribute was forged and should have not be authentic")
+	}
+}

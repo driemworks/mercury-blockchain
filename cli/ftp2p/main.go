@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"ftp2p/main/manifest"
+	"ftp2p/manifest"
 	"os"
 
 	"github.com/spf13/cobra"
