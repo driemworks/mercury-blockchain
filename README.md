@@ -30,18 +30,12 @@ File Transfer: Peer-to-Peer is a blockchain to facilitate sharing of data via IP
 
 ### Development
 TODO:
-- Validate CID before adding to tx: https://github.com/ipfs/go-cid 
-- build encryption/decryption functionality (need to integrate with go-ethereum first)
-- determine best way to upload to IPFS
-- avoid sending duplicate files
+- [-] Build encryption/decryption functionality (need to integrate with go-ethereum first) and expose via API
+- [-] Add TrustedPeers to node and expose via API
+- [-] Add tests
 
 ### Testing
-- ex: $ go test ./node/ -test.v -test.run ^TestValidBlockHash$
-
-### Just some thoughts...
-- by default there is duplicate transaction (i.e. duplicate file upload) protection!
-- PoW is too slow... consider replacing
-
+- ex: $ go test ./node/ -test.v -test.run ^TestValidBlockHash$ 
 
 ## Acknowledgements
 - This repository is heavily influenced by this repo and the associated ebook https://github.com/web3coach/the-blockchain-bar
