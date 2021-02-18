@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -13,6 +14,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"golang.org/x/crypto/nacl/box"
 )
 
 // The password for testing keystore files:
@@ -101,43 +103,43 @@ func TestSign(t *testing.T) {
 	}
 }
 
-func TestSignTxWithKeystoreAccount(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "wallet_test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer manifest.RemoveDir(tmpDir)
+// func TestSignTxWithKeystoreAccount(t *testing.T) {
+// 	tmpDir, err := ioutil.TempDir("", "wallet_test")
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// 	defer manifest.RemoveDir(tmpDir)
 
-	andrej, err := NewKeystoreAccount(tmpDir, testKeystoreAccountsPwd)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+// 	andrej, err := NewKeystoreAccount(tmpDir, testKeystoreAccountsPwd)
+// 	if err != nil {
+// 		t.Error(err)
+// 		return
+// 	}
 
-	babaYaga, err := NewKeystoreAccount(tmpDir, testKeystoreAccountsPwd)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+// 	babaYaga, err := NewKeystoreAccount(tmpDir, testKeystoreAccountsPwd)
+// 	if err != nil {
+// 		t.Error(err)
+// 		return
+// 	}
 
-	tx := manifest.NewTx(manifest.NewAddress("test"), manifest.NewAddress("test2"), manifest.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", ""), 0, 0)
+// 	tx := manifest.NewTx(manifest.NewAddress("test"), manifest.NewAddress("test2"), manifest.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", ""), 0, 0)
 
-	signedTx, err := SignTxWithKeystoreAccount(tx, andrej, testKeystoreAccountsPwd, GetKeystoreDirPath(tmpDir))
-	if err != nil {
-		t.Error(err)
-		return
-	}
+// 	signedTx, err := SignTxWithKeystoreAccount(tx, andrej, testKeystoreAccountsPwd, GetKeystoreDirPath(tmpDir))
+// 	if err != nil {
+// 		t.Error(err)
+// 		return
+// 	}
 
-	ok, err := signedTx.IsAuthentic()
-	if err != nil {
-		t.Error(err)
-		return
-	}
+// 	ok, err := signedTx.IsAuthentic()
+// 	if err != nil {
+// 		t.Error(err)
+// 		return
+// 	}
 
-	if !ok {
-		t.Fatal("the TX was signed by 'from' account and should have been authentic")
-	}
-}
+// 	if !ok {
+// 		t.Fatal("the TX was signed by 'from' account and should have been authentic")
+// 	}
+// }
 
 func TestSignForgedTxWithKeystoreAccount(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "wallet_test")
@@ -174,5 +176,38 @@ func TestSignForgedTxWithKeystoreAccount(t *testing.T) {
 
 	if ok {
 		t.Fatal("the TX 'from' attribute was forged and should have not be authentic")
+	}
+}
+
+func TestSealOpen(t *testing.T) {
+	publicKey1, privateKey1, _ := box.GenerateKey(rand.Reader)
+	publicKey2, privateKey2, _ := box.GenerateKey(rand.Reader)
+
+	if *privateKey1 == *privateKey2 {
+		t.Fatalf("private keys are equal!")
+	}
+	if *publicKey1 == *publicKey2 {
+		t.Fatalf("public keys are equal!")
+	}
+	message := []byte("test message")
+	var nonce [24]byte
+
+	out := box.Seal(nil, message, &nonce, publicKey1, privateKey2)
+	opened, ok := box.Open(nil, out, &nonce, publicKey2, privateKey1)
+	if !ok {
+		t.Fatalf("failed to open box")
+	}
+
+	if !bytes.Equal(opened, message) {
+		t.Fatalf("got %x, want %x", opened, message)
+	}
+
+	for i := range out {
+		out[i] ^= 0x40
+		_, ok := box.Open(nil, out, &nonce, publicKey2, privateKey1)
+		if ok {
+			t.Fatalf("opened box with byte %d corrupted", i)
+		}
+		out[i] ^= 0x40
 	}
 }

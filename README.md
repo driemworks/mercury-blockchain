@@ -31,6 +31,7 @@ File Transfer: Peer-to-Peer is a blockchain to facilitate sharing of data via IP
 ### Development
 TODO:
 - [-] Build encryption/decryption functionality (need to integrate with go-ethereum first) and expose via API
+  - WIP: encryption/decryption is available in a limited way -> only for string data and you can only encrypt/decrypt for yourself
 - [-] Add TrustedPeers to node and expose via API
 - [-] Add tests
 

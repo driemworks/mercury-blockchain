@@ -98,6 +98,7 @@ func (n *Node) Run(ctx context.Context) error {
 		sendTokensHandler(w, r, n)
 	})
 	// encrypt some data
+	// for now, only allow string data, but change that in the future
 	http.HandleFunc("/encrypt", func(w http.ResponseWriter, r *http.Request) {
 		encryptDataHandler(w, r, n)
 	})

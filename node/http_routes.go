@@ -202,16 +202,20 @@ func encryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		writeErrRes(w, err)
 		return
 	}
-	// needed?
-	setupResponse(&w, r)
-	if (*r).Method == "OPTIONS" {
-		return
-	}
+	// TODO - condense/cleanup these params
 	encryptedData, err := wallet.Encrypt(
-		wallet.GetEncryptionPublicKey(req.To),
+		wallet.GetKeystoreDirPath(node.datadir),
+		req.FromPwd,
+		node.info.Address,
+		manifest.NewAddress(req.To).Hash().Bytes(),
 		[]byte(req.Data),
 		wallet.X25519,
 	)
+	// encryptedData, err := wallet.Encrypt(
+	// 	manifest.NewAddress(req.To).Hash().Bytes(),
+	// 	[]byte(req.Data),
+	// 	wallet.X25519,
+	// )
 	if err != nil {
 		writeErrRes(w, err)
 		return
@@ -232,11 +236,23 @@ func decryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		req.FromPwd,
 		&req.EncryptedData,
 	)
+	// prvKey, err := wallet.RecoverPrivateKey(
+	// 	wallet.GetKeystoreDirPath(node.datadir),
+	// 	req.FromPwd,
+	// 	node.info.Address,
+	// )
+	// if err != nil {
+	// 	writeErrRes(w, err)
+	// 	return
+	// }
+	// decryptedData, err := wallet.Decrypt(
+	// 	prvKey,
+	// 	&req.EncryptedData,
+	// )
 	if err != nil {
 		writeErrRes(w, err)
 		return
 	}
-	fmt.Printf("the decrypted data is %x", len(decryptedData))
 	writeRes(w, DecryptDataResponse{string(decryptedData)})
 }
 

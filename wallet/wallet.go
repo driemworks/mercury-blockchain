@@ -15,9 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/nacl/box"
 )
 
@@ -28,10 +26,10 @@ const X25519 = "x25519-xsalsa20-poly1305"
 
 // EncryptedData is encrypted blob
 type EncryptedData struct {
-	Version        string `json:"version"`
-	Nonce          string `json:"nonce"`
-	EphemPublicKey string `json:"ephemeral_public_key"`
-	Ciphertext     string `json:"cipher_text"`
+	Version    string `json:"version"`
+	Nonce      string `json:"nonce"`
+	PublicKey  string `json:"public_key"`
+	Ciphertext string `json:"cipher_text"`
 }
 
 type Wallet struct {
@@ -52,86 +50,90 @@ func NewKeystoreAccount(dataDir, password string) (common.Address, error) {
 	return acc.Address, nil
 }
 
-// Credit for the following three functions goes to: https://github.com/bakaoh/eip1024/blob/master/eip1024.go
-
-// GetEncryptionPublicKey returns user's public Encryption key derived from privateKey Ethereum key
-func GetEncryptionPublicKey(receiverAddress string) string {
-	privateKey0, _ := hexutil.Decode("0x" + receiverAddress)
-	privateKey := [32]byte{}
-	copy(privateKey[:], privateKey0[:32])
-
-	var publicKey [32]byte
-	curve25519.ScalarBaseMult(&publicKey, &privateKey)
-	return base64.StdEncoding.EncodeToString(publicKey[:])
-}
-
 // Encrypt plain data
-func Encrypt(receiverPublicKey string, data []byte, version string) (*EncryptedData, error) {
+func Encrypt(keystoreDir string, pwd string, fromAddress common.Address,
+	toPublicKey []byte, data []byte, version string) (*EncryptedData, error) {
 	switch version {
 	case X25519:
-		fmt.Println("Using X25519")
-		ephemeralPublic, ephemeralPrivate, _ := box.GenerateKey(rand.Reader)
-		publicKey0, _ := base64.StdEncoding.DecodeString(receiverPublicKey)
-		publicKey := [32]byte{}
-		copy(publicKey[:], publicKey0[:32])
+
+		fmt.Println("Encrypting data using X25519")
+		_toPublicKey := [32]byte{}
+		copy(_toPublicKey[:], toPublicKey)
+
+		_fromPublicKey := [32]byte{}
+		copy(_fromPublicKey[:], fromAddress.Hash().Bytes()[:])
 
 		var nonce [24]byte
 		if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
 			return nil, err
 		}
+		senderPrivateKey, err := RecoverPrivateKey(keystoreDir, pwd, fromAddress)
+		if err != nil {
+			return nil, err
+		}
+		fromPrivateKey := [32]byte{}
+		copy(fromPrivateKey[:], senderPrivateKey[:32])
+		fmt.Printf("SEALING BOX WITH:\n box: %x\n nonce: %x\n public key: %x\n private key: %x\n",
+			data, &nonce, &_toPublicKey, &fromPrivateKey)
 
-		out := box.Seal(nil, data, &nonce, &publicKey, ephemeralPrivate)
+		var sharedKey [32]byte
+		box.Precompute(&sharedKey, &_toPublicKey, &fromPrivateKey)
+		fmt.Println("SHARED KEY")
+		fmt.Println(sharedKey)
+		out := box.Seal(nil, data, &nonce, &_toPublicKey, &fromPrivateKey)
 
 		return &EncryptedData{
-			Version:        version,
-			Nonce:          base64.StdEncoding.EncodeToString(nonce[:]),
-			EphemPublicKey: base64.StdEncoding.EncodeToString(ephemeralPublic[:]),
-			Ciphertext:     base64.StdEncoding.EncodeToString(out),
+			Version:    version,
+			Nonce:      base64.StdEncoding.EncodeToString(nonce[:]),
+			PublicKey:  base64.StdEncoding.EncodeToString(_fromPublicKey[:]),
+			Ciphertext: base64.StdEncoding.EncodeToString(out),
 		}, nil
 	default:
 		return nil, errors.New("Encryption type/version not supported")
 	}
 }
 
+// TODO!!!! For some reason, this isn't working cross-client
+// i.e. If I am node_1 and I encrypt a message with the /encrypt endpoint for node_2
+//		then the message cannot be decrypted, but if node_1 encrypts for itself, then it's fine....
 // Decrypt some encrypted data.
 func Decrypt(keystoreDir string, address common.Address, pwd string, encryptedData *EncryptedData) ([]byte, error) {
-	keystoreJSON, err := recoverKeystoreJSON(keystoreDir, address)
-	if err != nil {
-		return []byte{}, err
-	}
-	key, err := keystore.DecryptKey(keystoreJSON, pwd)
-	if err != nil {
-		return []byte{}, err
-	}
-	receiverPrivateKey := string(crypto.FromECDSA(key.PrivateKey))
-	if err != nil {
-		return []byte{}, err
-	}
 	switch encryptedData.Version {
 	case X25519:
-		fmt.Println("Using X25519")
-		privateKey0, _ := hexutil.Decode("0x" + receiverPrivateKey)
-		privateKey := [32]byte{}
-		copy(privateKey[:], privateKey0[:32])
+		fmt.Println("Decrypting data using X25519")
+		// get your own private key
+		_toPrivateKey, err := RecoverPrivateKey(keystoreDir, pwd, address)
+		if err != nil {
+			return []byte{}, err
+		}
+		toPrivateKey := [32]byte{}
+		copy(toPrivateKey[:], _toPrivateKey[:32])
 		// assemble decryption parameters
 		nonce, _ := base64.StdEncoding.DecodeString(encryptedData.Nonce)
 		ciphertext, _ := base64.StdEncoding.DecodeString(encryptedData.Ciphertext)
-		ephemPublicKey, _ := base64.StdEncoding.DecodeString(encryptedData.EphemPublicKey)
-
-		publicKey := [32]byte{}
-		copy(publicKey[:], ephemPublicKey[:32])
+		// public key of message sender
+		_fromPublicKey, _ := base64.StdEncoding.DecodeString(encryptedData.PublicKey)
+		fromPublicKey := [32]byte{}
+		copy(fromPublicKey[:], _fromPublicKey[:32])
 
 		nonce24 := [24]byte{}
 		copy(nonce24[:], nonce[:24])
 
-		var out []byte
-		decryptedMessage, _ := box.Open(out, ciphertext, &nonce24, &publicKey, &privateKey)
+		var sharedKey [32]byte
+		box.Precompute(&sharedKey, &fromPublicKey, &toPrivateKey)
+		fmt.Println("SHARED KEY")
+		fmt.Println(sharedKey)
+		fmt.Printf("OPENING BOX WITH:\n box: %x\n nonce: %x\n public key: %x\n private key: %x\n",
+			ciphertext, &nonce24, &fromPublicKey, &toPrivateKey)
+		decryptedMessage, ok := box.Open(nil, ciphertext, &nonce24, &fromPublicKey, &toPrivateKey)
+		if !ok {
+			fmt.Println(ok)
+		}
 		return decryptedMessage, nil
 	default:
 		return nil, errors.New("Decryption type/version not supported")
 	}
 }
-
 func SignTxWithKeystoreAccount(tx manifest.Tx, address common.Address, pwd, keystoreDir string) (manifest.SignedTx, error) {
 	// ks := keystore.NewKeyStore(keystoreDir, keystore.StandardScryptN, keystore.StandardScryptP)
 
@@ -209,3 +211,73 @@ func Verify(msg, sig []byte) (*ecdsa.PublicKey, error) {
 
 	return recoveredPubKey, nil
 }
+
+func RecoverPrivateKey(keystoreDir string, pwd string, address common.Address) ([]byte, error) {
+	keystoreJSON, err := recoverKeystoreJSON(keystoreDir, address)
+	if err != nil {
+		return []byte{}, err
+	}
+	key, err := keystore.DecryptKey(keystoreJSON, pwd)
+	if err != nil {
+		return []byte{}, err
+	}
+	receiverPrivateKey := crypto.FromECDSA(key.PrivateKey)
+	if err != nil {
+		return []byte{}, err
+	}
+	return receiverPrivateKey, err
+}
+
+// // Encrypt plain data
+// func Encrypt(receiverPublicKey []byte, data []byte, version string) (*EncryptedData, error) {
+// 	switch version {
+// 	case "x25519-xsalsa20-poly1305":
+// 		ephemeralPublic, ephemeralPrivate, _ := box.GenerateKey(rand.Reader)
+
+// 		// publicKey0, _ := base64.StdEncoding.DecodeString(receiverPublicKey)
+// 		publicKey := [32]byte{}
+// 		copy(publicKey[:], receiverPublicKey[:32])
+
+// 		var nonce [24]byte
+// 		if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
+// 			return nil, err
+// 		}
+
+// 		out := box.Seal(nil, data, &nonce, &publicKey, ephemeralPrivate)
+
+// 		return &EncryptedData{
+// 			Version:    version,
+// 			Nonce:      base64.StdEncoding.EncodeToString(nonce[:]),
+// 			PublicKey:  base64.StdEncoding.EncodeToString(ephemeralPublic[:]),
+// 			Ciphertext: base64.StdEncoding.EncodeToString(out),
+// 		}, nil
+// 	default:
+// 		return nil, errors.New("Encryption type/version not supported")
+// 	}
+// }
+
+// // Decrypt some encrypted data.
+// func Decrypt(recievierPrivatekey []byte, encryptedData *EncryptedData) ([]byte, error) {
+// 	switch encryptedData.Version {
+// 	case "x25519-xsalsa20-poly1305":
+// 		// privateKey0, _ := hexutil.Decode("0x" + recievierPrivatekey)
+// 		privateKey := [32]byte{}
+// 		copy(privateKey[:], recievierPrivatekey[:32])
+
+// 		// assemble decryption parameters
+// 		nonce, _ := base64.StdEncoding.DecodeString(encryptedData.Nonce)
+// 		ciphertext, _ := base64.StdEncoding.DecodeString(encryptedData.Ciphertext)
+// 		ephemPublicKey, _ := base64.StdEncoding.DecodeString(encryptedData.PublicKey)
+
+// 		publicKey := [32]byte{}
+// 		copy(publicKey[:], ephemPublicKey[:32])
+
+// 		nonce24 := [24]byte{}
+// 		copy(nonce24[:], nonce[:24])
+
+// 		decryptedMessage, _ := box.Open(nil, ciphertext, &nonce24, &publicKey, &privateKey)
+// 		return decryptedMessage, nil
+// 	default:
+// 		return nil, errors.New("Decryption type/version not supported")
+// 	}
+// }
