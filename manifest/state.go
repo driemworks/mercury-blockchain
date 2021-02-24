@@ -105,12 +105,38 @@ func NewStateFromDisk(datadir string) (*State, error) {
 
 func (s *State) AddBlock(b Block) (Hash, error) {
 	pendingState := s.copy()
+	nextExpectedBlockNumber := s.latestBlock.Header.Number + 1
 	// if it's the parent hash, do nothing
-	if b.Header.Number == s.latestBlock.Header.Number-1 {
-		return Hash{}, nil
+	// if b.Header.Number == s.latestBlock.Header.Number-1 {
+	// 	return Hash{}, nil
+	// }
+
+	hash, err := b.Hash()
+	if err != nil {
+		return Hash{}, err
+	}
+	if s.hasGenesisBlock && b.Header.Number != nextExpectedBlockNumber {
+		if s.latestBlock.Header.Number == b.Header.Number {
+			if s.latestBlockHash == hash {
+				// they're the same block... do nothing
+				return Hash{}, nil
+			} else if s.latestBlock.Header.PoW < b.Header.PoW {
+				// orphan your latest block, wait until next sync cycle to get new blocks
+				// could change this, but this is the simplest way to do it
+				fmt.Println("Orphan-ing your latest block and rewards")
+				err = s.orphanLatestBlock()
+				if err != nil {
+					return Hash{}, err
+				}
+			} else {
+				// your block wins... stop mining from this peer
+				fmt.Println("congrats.. your block wins (greater PoW)")
+				return Hash{}, nil
+			}
+		}
 	}
 
-	err := ApplyBlock(b, &pendingState)
+	err = ApplyBlock(b, &pendingState)
 	if err != nil {
 		return Hash{}, err
 	}
@@ -143,6 +169,100 @@ func (s *State) AddBlock(b Block) (Hash, error) {
 	s.hasGenesisBlock = true
 
 	return blockHash, nil
+}
+
+func ApplyBlock(b Block, s *State) error {
+	nextExpectedBlockNumber := s.latestBlock.Header.Number + 1
+	hash, err := b.Hash()
+	if err != nil {
+		return err
+	}
+
+	if s.hasGenesisBlock && b.Header.Number != nextExpectedBlockNumber {
+		return fmt.Errorf("next expected block number must be '%d' not '%d'", nextExpectedBlockNumber, b.Header.Number)
+	} else if s.hasGenesisBlock && s.latestBlock.Header.Number > 0 && !reflect.DeepEqual(b.Header.Parent, s.latestBlockHash) {
+		return fmt.Errorf("next block parent hash must be '%x' not '%x'", s.latestBlockHash, b.Header.Parent)
+	}
+	if !IsBlockHashValid(hash) {
+		return fmt.Errorf(rainbow.Red("Invalid block hash %x"), hash)
+	}
+	err = applyTXs(b.TXs, s)
+	if err != nil {
+		return err
+	}
+	tmp := s.Manifest[b.Header.Miner]
+	tmp.Balance += BlockReward
+	tmp.PendingBalance += BlockReward
+	s.Manifest[b.Header.Miner] = tmp
+
+	return nil
+}
+
+func (s *State) orphanLatestBlock() error {
+	// s.Close()
+	writeEmptyBlocksDbToDisk(getBlocksDbFilePath(s.datadir, true))
+	tempDbFile, err := os.OpenFile(getBlocksDbFilePath(s.datadir, true), os.O_APPEND|os.O_RDWR, 0600)
+	blockDbFile, err := os.OpenFile(s.dbFile.Name(), os.O_APPEND|os.O_RDWR, 0600)
+	if err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(blockDbFile)
+	numBlocks := 0
+	for scanner.Scan() {
+		// handle scanner error
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+		blockFsJSON := scanner.Bytes()
+		if len(blockFsJSON) == 0 {
+			break
+		}
+		var blockFs BlockFS
+		if err := json.Unmarshal(blockFsJSON, &blockFs); err != nil {
+			fmt.Println("OH NOOO 1")
+			return err
+		}
+		// if the block's number equals the input block's number, then do nothing
+		// if blockFs.Value.Header.Number < s.latestBlock.Header.Number {
+		fmt.Println("WRITING ALL BLOCKS TO BLOCK.DB.TMP.0")
+		tempDbFile.Write(append(blockFsJSON, '\n'))
+		numBlocks = numBlocks + 1 // could probably just use block number for this...
+		// }
+	}
+	fmt.Println("Hey 1")
+	// now clear the blockDbFile
+	writeEmptyBlocksDbToDisk(getBlocksDbFilePath(s.datadir, false))
+	fmt.Println("Hey 2")
+	scanner_2 := bufio.NewScanner(tempDbFile)
+	blockToWrite := numBlocks - 1
+	for scanner_2.Scan() {
+		// handle scanner error
+		if err = scanner_2.Err(); err != nil {
+			return err
+		}
+		blockFsJSON := scanner_2.Bytes()
+		if len(blockFsJSON) == 0 {
+			break
+		}
+		var blockFs BlockFS
+		if err = json.Unmarshal(blockFsJSON, &blockFs); err != nil {
+			return err
+		}
+		fmt.Printf("Hey num blocks to write %d\n", blockToWrite)
+		// if the block's number equals the input block's number, then do nothing
+		// if blockFs.Value.Header.Number < s.latestBlock.Header.Number {
+		if blockToWrite >= 0 {
+			fmt.Println("WRITING ALL VALID BLOCKS FROM BLOCK.DB.TMP.0 TO BLOCK.DB")
+			blockDbFile.Write(append(blockFsJSON, '\n'))
+			blockToWrite = blockToWrite - 1
+		}
+		// }
+	}
+	if err != nil {
+		return err
+	}
+	fmt.Println("ur done")
+	return nil
 }
 
 func (s *State) NextBlockNumber() uint64 {
@@ -205,7 +325,6 @@ func applyTx(tx SignedTx, s *State) error {
 	s.Manifest[tx.From] = senderMailbox
 	// update recipient inbox items
 	var receipientMailbox = s.Manifest[tx.To]
-	fmt.Printf("updating recipient's balance from %x to %x", receipientMailbox.Balance, receipientMailbox.Balance+tx.Amount)
 	receipientMailbox.Balance += tx.Amount
 	// add a new inbox item if there is a CID
 	if !tx.CID.IsEmpty() {
@@ -222,91 +341,6 @@ func (c *CID) IsEmpty() bool {
 
 func NewCID(cid string, gateway string) CID {
 	return CID{cid, gateway}
-}
-
-func ApplyBlock(b Block, s *State) error {
-	nextExpectedBlockNumber := s.latestBlock.Header.Number + 1
-	if s.hasGenesisBlock && b.Header.Number != nextExpectedBlockNumber {
-		// scenario: we mined the same block as the incoming block
-		//			1) check if b and s.latestBlock are the same block (same block number -> should check tx too maybe?)
-		if s.latestBlock.Header.Number == b.Header.Number {
-			bHash, err := b.Hash()
-			if err != nil {
-				return err
-			}
-			fmt.Printf("the block's hash is %x", rainbow.Bold(rainbow.BgMagenta(fmt.Sprint(bHash))))
-			// are they the same block? compare the Proof of Work  of both blocks
-			// block with greatest pow is added to blocks other block is orphaned or ignored
-			if s.latestBlock.Header.PoW < b.Header.PoW {
-				s.orphanLatestBlock()
-				s, err := NewStateFromDisk(s.datadir)
-				if err != nil {
-					return err
-				}
-				fmt.Printf("Reloaded state. Latest blockhash is: %x", rainbow.Yellow(fmt.Sprint(s.latestBlockHash)))
-			} else {
-				return fmt.Errorf("next expected block number must be '%d' not '%d'", nextExpectedBlockNumber, b.Header.Number)
-			}
-
-		} else {
-			return fmt.Errorf("next expected block number must be '%d' not '%d'", nextExpectedBlockNumber, b.Header.Number)
-		}
-	} else if s.hasGenesisBlock && s.latestBlock.Header.Number > 0 && !reflect.DeepEqual(b.Header.Parent, s.latestBlockHash) {
-		return fmt.Errorf("next block parent hash must be '%x' not '%x'", s.latestBlockHash, b.Header.Parent)
-	}
-
-	hash, err := b.Hash()
-	if err != nil {
-		return err
-	}
-	if !IsBlockHashValid(hash) {
-		return fmt.Errorf(rainbow.Red("Invalid block hash %x"), hash)
-	}
-	err = applyTXs(b.TXs, s)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Giving block reward to %x", rainbow.Yellow(b.Header.Miner.Hex()))
-	tmp := s.Manifest[b.Header.Miner]
-	tmp.Balance += BlockReward
-	tmp.PendingBalance += BlockReward
-	s.Manifest[b.Header.Miner] = tmp
-
-	return nil
-}
-
-func (s *State) orphanLatestBlock() error {
-	writeEmptyBlocksDbToDisk(getBlocksDbFilePath(s.datadir, true))
-	tempDbFile, err := os.OpenFile(getBlocksDbFilePath(s.datadir, true), os.O_APPEND|os.O_RDWR, 0600)
-	// ioutil.WriteFile(getBlocksDbFilePath(s.datadir, true), []byte(""), os.ModePerm)
-	blockDbFile, err := os.OpenFile(s.dbFile.Name(), os.O_APPEND|os.O_RDWR, 0600)
-	if err != nil {
-		return err
-	}
-	scanner := bufio.NewScanner(blockDbFile)
-	for scanner.Scan() {
-		// handle scanner error
-		if err := scanner.Err(); err != nil {
-			return err
-		}
-		blockFsJSON := scanner.Bytes()
-		if len(blockFsJSON) == 0 {
-			break
-		}
-		var blockFs BlockFS
-		if err := json.Unmarshal(blockFsJSON, &blockFs); err != nil {
-			return err
-		}
-		// if the block's number equals the input block's number, then do nothing
-		if blockFs.Value.Header.Number < s.latestBlock.Header.Number {
-			tempDbFile.Write(append(blockFsJSON, '\n'))
-		}
-	}
-	err = Rename(tempDbFile.Name(), blockDbFile.Name())
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 /*

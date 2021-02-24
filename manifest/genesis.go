@@ -16,8 +16,8 @@ var genesisJson = `
 			"alias": "tony",
             "sent": [],
             "inbox": [],
-			"balance": 100000,
-			"pending_balance": 100000
+			"balance": 100000000,
+			"pending_balance": 100000000
         }
     }
 }`

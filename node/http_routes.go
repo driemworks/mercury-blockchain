@@ -30,11 +30,12 @@ type ErrorResponse struct {
 
 // StatusResponse TODO
 type StatusResponse struct {
-	Hash       manifest.Hash       `json:"block_hash"`
-	Number     uint64              `json:"block_number"`
-	Alias      string              `json:"alias"`
-	KnownPeers map[string]PeerNode `json:"known_peers"`
-	PendingTxs []manifest.SignedTx `json:"pending_txs"`
+	Hash         manifest.Hash       `json:"block_hash"`
+	Number       uint64              `json:"block_number"`
+	Alias        string              `json:"alias"`
+	KnownPeers   map[string]PeerNode `json:"known_peers"`
+	TrustedPeers map[string]PeerNode `json:"trusted_peers"`
+	PendingTxs   []manifest.SignedTx `json:"pending_txs"`
 }
 
 type TokenRequestResponse struct {
@@ -56,7 +57,7 @@ type manifestResponse struct {
 type userMailboxResponse struct {
 	Hash    manifest.Hash     `json:"hash"`
 	Address common.Address    `json:"address"`
-	Alias   string            `json:"alias"`
+	Name    string            `json:"name"`
 	Mailbox manifest.Manifest `json:"mailbox"`
 }
 
@@ -103,7 +104,7 @@ func viewMailboxHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	}
 	// address := manifest.NewAddress(from)
 	writeRes(w, userMailboxResponse{node.state.LatestBlockHash(),
-		from, node.alias, node.state.Manifest[from]})
+		from, node.name, node.state.Manifest[from]})
 }
 
 /**
@@ -263,7 +264,7 @@ func nodeStatusHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	res := StatusResponse{
 		Hash:       node.state.LatestBlockHash(),
 		Number:     node.state.LatestBlock().Header.Number,
-		Alias:      node.alias,
+		Alias:      node.name,
 		KnownPeers: node.knownPeers,
 		PendingTxs: node.getPendingTXsAsArray(),
 	}
@@ -305,7 +306,7 @@ func addPeerHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		writeRes(w, AddPeerRes{false, err.Error()})
 		return
 	}
-	peer := NewPeerNode(peerIP, peerPort, false, manifest.NewAddress(minerRaw), true)
+	peer := NewPeerNode("", peerIP, peerPort, false, manifest.NewAddress(minerRaw), true)
 	node.AddPeer(peer)
 	fmt.Printf("Peer "+rainbow.Green("'%s'")+" was added into KnownPeers\n", peer.TcpAddress())
 	writeRes(w, AddPeerRes{true, ""})

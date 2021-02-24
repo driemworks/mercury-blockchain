@@ -36,6 +36,7 @@ func TestNode_Mining(t *testing.T) {
 	// Required for AddPendingTX() to describe
 	// from what node the TX came from (local node in this case)
 	nInfo := NewPeerNode(
+		"test",
 		"127.0.0.1",
 		8085,
 		false,

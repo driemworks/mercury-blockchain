@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"ftp2p/logging"
 	"ftp2p/manifest"
-	"ftp2p/wallet"
 	"net/http"
 	"time"
 
@@ -18,6 +17,7 @@ const miningIntervalSeconds = 10
 const syncIntervalSeconds = 30
 
 type PeerNode struct {
+	Name        string         `json:"name"`
 	IP          string         `json:"ip"`
 	Port        uint64         `json:"port"`
 	IsBootstrap bool           `json:"is_bootstrap"`
@@ -36,25 +36,27 @@ type Node struct {
 	state           *manifest.State
 	info            PeerNode
 	knownPeers      map[string]PeerNode
+	trustedPeers    map[string]PeerNode
 	pendingTXs      map[string]manifest.SignedTx
 	archivedTXs     map[string]manifest.SignedTx
 	newSyncedBlocks chan manifest.Block
 	newPendingTXs   chan manifest.SignedTx
 	isMining        bool
-	alias           string
-	wallet          wallet.Wallet
+	name            string
+	// wallet          wallet.Wallet
 }
 
-func NewNode(alias string, datadir string, ip string, port uint64, address common.Address, boostrap PeerNode) *Node {
+func NewNode(name string, datadir string, ip string, port uint64, address common.Address, boostrap PeerNode) *Node {
 	knownPeers := make(map[string]PeerNode)
 	knownPeers[boostrap.TcpAddress()] = boostrap
 	return &Node{
-		alias:           alias,
+		name:            name,
 		datadir:         datadir,
 		ip:              ip,
 		port:            port,
 		knownPeers:      knownPeers,
-		info:            NewPeerNode(ip, port, false, address, true),
+		trustedPeers:    make(map[string]PeerNode),
+		info:            NewPeerNode(name, ip, port, false, address, true),
 		pendingTXs:      make(map[string]manifest.SignedTx),
 		archivedTXs:     make(map[string]manifest.SignedTx),
 		newSyncedBlocks: make(chan manifest.Block),
@@ -63,8 +65,8 @@ func NewNode(alias string, datadir string, ip string, port uint64, address commo
 	}
 }
 
-func NewPeerNode(ip string, port uint64, isBootstrap bool, address common.Address, connected bool) PeerNode {
-	return PeerNode{ip, port, isBootstrap, address, connected}
+func NewPeerNode(name string, ip string, port uint64, isBootstrap bool, address common.Address, connected bool) PeerNode {
+	return PeerNode{name, ip, port, isBootstrap, address, connected}
 }
 
 /**

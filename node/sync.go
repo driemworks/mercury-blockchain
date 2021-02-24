@@ -104,11 +104,11 @@ func (n *Node) syncBlocks(peer PeerNode, status StatusResponse) error {
 		fmt.Printf("Found %d new blocks from Peer %s\n", newBlocksCount,
 			rainbow.Bold(rainbow.Green(peer.TcpAddress())))
 	}
-
-	blockHash := n.state.LatestBlockHash()
-	// retrieve the latest block from the parent block (so if all goes well the first block is the same block we have)
+	// blocks, err := fetchBlocksFromPeer(peer, n.state.LatestBlock().Header.Parent)
+	// get blocks from the peer's latest block's parent
+	blockHash := n.state.LatestBlock().Header.Parent
+	// retrieve all blocks after the parent block
 	blocks, err := fetchBlocksFromPeer(peer, blockHash)
-	// remove first block? (parent) what's the best way??
 	if err != nil {
 		return err
 	}

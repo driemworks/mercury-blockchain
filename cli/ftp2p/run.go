@@ -40,6 +40,7 @@ func runCmd() *cobra.Command {
 			fmt.Printf("\t\t Using bootstrap node: %s:%s\n", rainbow.Green("127.0.0.1"), rainbow.Green(fmt.Sprint(8080)))
 			fmt.Println("")
 			bootstrap := node.NewPeerNode(
+				"tony",
 				bootstrapIP,
 				bootstrapPort,
 				true,
