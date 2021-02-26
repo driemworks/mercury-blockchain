@@ -189,7 +189,7 @@ func (n *Node) minePendingTXs(ctx context.Context) error {
 	}
 
 	n.removeMinedPendingTXs(minedBlock)
-	_, err = n.state.AddBlock(minedBlock)
+	_, _, err = n.state.AddBlock(minedBlock)
 	if err != nil {
 		return err
 	}
