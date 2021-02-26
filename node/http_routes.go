@@ -68,10 +68,6 @@ type cidAddRequest struct {
 	FromPwd string `json:"from_pwd"`
 }
 
-type cidAddResponse struct {
-	Success bool `json:"success"`
-}
-
 type encryptDataRequest struct {
 	Data    string `json:"data"` // doing this for now, change to multipart upload later
 	To      string `json:"to"`
@@ -89,6 +85,10 @@ type DecryptDataRequest struct {
 
 type DecryptDataResponse struct {
 	Data string `json:"data"`
+}
+
+type AddTrustedPeerNodeRequest struct {
+	TcpAddress string `json:"tcp_address"`
 }
 
 /**
@@ -160,7 +160,25 @@ func addCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		writeErrRes(w, err)
 		return
 	}
-	writeRes(w, cidAddResponse{Success: true})
+	writeRes(w, struct{}{})
+}
+
+func addTrustedPeerNodeHandler(w http.ResponseWriter, r *http.Request, node *Node) {
+	req := AddTrustedPeerNodeRequest{}
+	err := readReq(r, &req)
+	if err != nil {
+		writeErrRes(w, err)
+		return
+	}
+	if node.knownPeers[req.TcpAddress].Address == manifest.NewAddress("0x0000000000000000000000000000000000000000") {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("{\"error_code\": \"ERR_001\", \"error_desc\": \"no known node with provided address\"}"))
+	}
+	node.trustedPeers[req.TcpAddress] = node.knownPeers[req.TcpAddress]
+	writeRes(w, struct{ trustedPeers map[string]PeerNode }{
+		node.trustedPeers,
+	})
 }
 
 // host:port/tokens POST
@@ -262,11 +280,12 @@ func decryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
  */
 func nodeStatusHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	res := StatusResponse{
-		Hash:       node.state.LatestBlockHash(),
-		Number:     node.state.LatestBlock().Header.Number,
-		Alias:      node.name,
-		KnownPeers: node.knownPeers,
-		PendingTxs: node.getPendingTXsAsArray(),
+		Hash:         node.state.LatestBlockHash(),
+		Number:       node.state.LatestBlock().Header.Number,
+		Alias:        node.name,
+		KnownPeers:   node.knownPeers,
+		TrustedPeers: node.trustedPeers,
+		PendingTxs:   node.getPendingTXsAsArray(),
 	}
 	writeRes(w, res)
 }
@@ -299,6 +318,7 @@ func syncHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 func addPeerHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	peerIP := r.URL.Query().Get("ip")
 	peerPortRaw := r.URL.Query().Get("port")
+	peerName := r.URL.Query().Get("name")
 	minerRaw := r.URL.Query().Get("miner")
 
 	peerPort, err := strconv.ParseUint(peerPortRaw, 10, 32)
@@ -306,7 +326,7 @@ func addPeerHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		writeRes(w, AddPeerRes{false, err.Error()})
 		return
 	}
-	peer := NewPeerNode("", peerIP, peerPort, false, manifest.NewAddress(minerRaw), true)
+	peer := NewPeerNode(peerName, peerIP, peerPort, false, manifest.NewAddress(minerRaw), true)
 	node.AddPeer(peer)
 	fmt.Printf("Peer "+rainbow.Green("'%s'")+" was added into KnownPeers\n", peer.TcpAddress())
 	writeRes(w, AddPeerRes{true, ""})

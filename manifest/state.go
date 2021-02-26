@@ -125,11 +125,13 @@ func (s *State) AddBlock(b Block) (*State, Hash, error) {
 					return nil, Hash{}, err
 				}
 				// reset the node's state
-				s, err = NewStateFromDisk(s.datadir)
+				pendingState, err := NewStateFromDisk(pendingState.datadir)
 				if err != nil {
 					return nil, Hash{}, err
 				}
-				return s, Hash{}, fmt.Errorf("ORPHAN BLOCK ENCOUNTERED")
+				s = pendingState
+				return nil, Hash{}, nil
+				// return s, Hash{}, fmt.Errorf("ORPHAN BLOCK ENCOUNTERED")
 			} else {
 				// your block wins... stop mining from this peer
 				fmt.Println("congrats.. your block wins (greater PoW)")

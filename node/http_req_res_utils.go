@@ -24,7 +24,7 @@ func writeRes(w http.ResponseWriter, content interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("access-control-allow-origin", "*")
 	w.Header().Set("access-control-allow-method", "*")
-	w.WriteHeader(http.StatusOK)
+	// w.WriteHeader(http.StatusOK)
 	w.Write(contentJson)
 }
 

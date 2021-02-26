@@ -19,6 +19,7 @@ const endpointAddPeer = "/node/peer"
 const endpointAddPeerQueryKeyIP = "ip"
 const endpointAddPeerQueryKeyPort = "port"
 const endpointAddPeerQueryKeyMiner = "miner"
+const endpointAddNameQueryKeyName = "name"
 
 func (n *Node) sync(ctx context.Context) error {
 	ticker := time.NewTicker(syncIntervalSeconds * time.Second)
@@ -156,13 +157,13 @@ func (n *Node) joinKnownPeers(peer PeerNode) error {
 	}
 
 	url := fmt.Sprintf(
-		"http://%s%s?%s=%s&%s=%d",
+		"http://%s%s?%s=%s&%s=%d&%s=%s&%s=%s",
 		peer.TcpAddress(),
 		endpointAddPeer,
-		endpointAddPeerQueryKeyIP,
-		n.info.IP,
-		endpointAddPeerQueryKeyPort,
-		n.info.Port,
+		endpointAddPeerQueryKeyIP, n.info.IP,
+		endpointAddPeerQueryKeyPort, n.info.Port,
+		endpointAddPeerQueryKeyMiner, n.info.Address,
+		endpointAddNameQueryKeyName, n.info.Name,
 	)
 
 	res, err := http.Get(url)

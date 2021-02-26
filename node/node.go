@@ -46,9 +46,9 @@ type Node struct {
 	// wallet          wallet.Wallet
 }
 
-func NewNode(name string, datadir string, ip string, port uint64, address common.Address, boostrap PeerNode) *Node {
+func NewNode(name string, datadir string, ip string, port uint64, address common.Address, bootstrap PeerNode) *Node {
 	knownPeers := make(map[string]PeerNode)
-	knownPeers[boostrap.TcpAddress()] = boostrap
+	knownPeers[bootstrap.TcpAddress()] = bootstrap
 	return &Node{
 		name:            name,
 		datadir:         datadir,
@@ -87,13 +87,17 @@ func (n *Node) Run(ctx context.Context) error {
 	go n.sync(ctx)
 	go n.mine(ctx)
 
-	// list manifest (for yourself)
+	// list mailbox (for yourself) - consider renaming? mailbox -> /
 	http.HandleFunc("/mailbox", func(w http.ResponseWriter, r *http.Request) {
 		viewMailboxHandler(w, r, n)
 	})
-	// send CID to someone
+	// send CID to someone -> renmame /cid/send?
 	http.HandleFunc("/mailbox/send", func(w http.ResponseWriter, r *http.Request) {
 		addCIDHandler(w, r, n)
+	})
+	// add a PeerNode to the trusted peers slice
+	http.HandleFunc("/friends/add", func(w http.ResponseWriter, r *http.Request) {
+		addTrustedPeerNodeHandler(w, r, n)
 	})
 	// send tokens to an address
 	http.HandleFunc("/tokens", func(w http.ResponseWriter, r *http.Request) {
@@ -176,7 +180,6 @@ func (n *Node) mine(ctx context.Context) error {
 }
 
 func (n *Node) minePendingTXs(ctx context.Context) error {
-	fmt.Printf("MINING PENDING TXs = next block num is %d\n", n.state.NextBlockNumber())
 	blockToMine := NewPendingBlock(
 		n.state.LatestBlockHash(),
 		n.state.NextBlockNumber(),
