@@ -230,11 +230,6 @@ func encryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		[]byte(req.Data),
 		wallet.X25519,
 	)
-	// encryptedData, err := wallet.Encrypt(
-	// 	manifest.NewAddress(req.To).Hash().Bytes(),
-	// 	[]byte(req.Data),
-	// 	wallet.X25519,
-	// )
 	if err != nil {
 		writeErrRes(w, err)
 		return

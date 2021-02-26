@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"ftp2p/manifest"
 	"ftp2p/node"
+	"math/rand"
 	"os"
 
 	"github.com/raphamorim/go-rainbow"
@@ -17,7 +18,7 @@ func runCmd() *cobra.Command {
 		Short: "Run the ftp2p node",
 		Run: func(cmd *cobra.Command, args []string) {
 
-			alias, _ := cmd.Flags().GetString(flagAlias)
+			name, _ := cmd.Flags().GetString(flagName)
 			miner, _ := cmd.Flags().GetString(flagMiner)
 			ip, _ := cmd.Flags().GetString(flagIP)
 			port, _ := cmd.Flags().GetUint64(flagPort)
@@ -47,7 +48,7 @@ func runCmd() *cobra.Command {
 				manifest.NewAddress("0x5e79986470914df6Cf60a232dE6761Bc862914c5"),
 				false,
 			)
-			n := node.NewNode(alias, getDataDirFromCmd(cmd), ip, port,
+			n := node.NewNode(name, getDataDirFromCmd(cmd), ip, port,
 				manifest.NewAddress(miner), bootstrap)
 			err := n.Run(context.Background())
 			if err != nil {
@@ -58,7 +59,7 @@ func runCmd() *cobra.Command {
 	}
 	addDefaultRequiredFlags(runCmd)
 
-	runCmd.Flags().String(flagAlias, "user", "Your account alias")
+	runCmd.Flags().String(flagName, fmt.Sprintf("user-%d", rand.Int()), "Your username")
 	runCmd.Flags().String(flagMiner, node.DefaultMiner, "miner account of this node to receive block rewards")
 	runCmd.Flags().Uint64(flagPort, 8080, "The ip to run the client on")
 	runCmd.Flags().String(flagIP, "127.0.0.1", "The ip to run the client with")
