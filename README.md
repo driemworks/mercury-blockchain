@@ -33,7 +33,7 @@ FTP2P is a blockchain to allow users (nodes) to securely share encrypted data wi
   ```
 
 ## API
-
+See the [API documentation](https://github.com/driemworks/ftp2p/blob/master/docs/api/api.md)
 
 
 
