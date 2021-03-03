@@ -32,44 +32,12 @@ FTP2P is a blockchain to allow users (nodes) to securely share encrypted data wi
   ftp2p run --datadir=./.ftp2p --name=Tony --miner=0x27084384033F90d96c3769e1b4fCE0E5ffff720B --port=8080
   ```
 
-### API
-`GET /mailbox`
-#### Response:
-    - **hash**: Your node's latest block's hash
-    - **address**: Your node's address
-    - **name:** Your (configured) name 
-    - **mailbox** 
-        - **inbox**: Transactions (CID/tokens) sent to this node by other nodes or yourself
-        - **sent**: Transactions (CID/tokens) sent from this node to other nodes or yourself
-        - **balance**: Your current balance
-        - **pending_balance**: Your pending balance
-Example:
-```json
-{
-    "hash": "0100fd3640ff8c96de62cf96c559c8a9d5a6de5a2c1392c01efb9aa8d3256253",
-    "address": "0x27084384033f90d96c3769e1b4fce0e5ffff720b",
-    "name": "theo",
-    "mailbox": {
-        "sent": null,
-        "inbox": [
-            {
-                "from": "0x5e79986470914df6cf60a232de6761bc862914c5",
-                "cid": {
-                    "cid": "QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQP",
-                    "ipfs_gateway": "localhost:4001/ipfs/"
-                },
-                "hash": "699150c5d277d285a3563ed3b6d48ad8ba724c405486444101d3318869c1740a",
-                "amount": 1
-            }
-        ],
-        "balance": 1,
-        "pending_balance": 1
-    }
-}
-```
-`POST /mailbox/send`
-`POST /friends/add`
-`POST /tokens`
+## API
+
+
+
+
+### Node API -> could become rpc endpoints?
 `POST /node/sync`
 `POST /node/status`
 `POST /node/peer`

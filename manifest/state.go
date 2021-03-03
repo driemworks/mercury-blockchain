@@ -226,24 +226,21 @@ func (s *State) orphanLatestBlock() error {
 		if err := json.Unmarshal(blockFsJSON, &blockFs); err != nil {
 			return err
 		}
-		// if the block's number equals the input block's number, then do nothing
-		// if blockFs.Value.Header.Number < s.latestBlock.Header.Number {
 		fmt.Println("WRITING ALL BLOCKS TO BLOCK.DB.TMP.0")
 		tempDbFile.Write(append(blockFsJSON, '\n'))
 		numBlocks = numBlocks + 1 // could probably just use block number for this...
-		// }
 	}
 	// clear block.db
 	writeEmptyBlocksDbToDisk(getBlocksDbFilePath(s.datadir, false))
 	tempDbFile, err = os.OpenFile(getBlocksDbFilePath(s.datadir, true), os.O_APPEND|os.O_RDWR, 0600)
-	scanner_2 := bufio.NewScanner(tempDbFile)
+	tempFileScanner := bufio.NewScanner(tempDbFile)
 	blockToWrite := latestBlockNumber - 1
-	for scanner_2.Scan() {
+	for tempFileScanner.Scan() {
 		// handle scanner error
-		if err = scanner_2.Err(); err != nil {
+		if err = tempFileScanner.Err(); err != nil {
 			return err
 		}
-		blockFsJSON := scanner_2.Bytes()
+		blockFsJSON := tempFileScanner.Bytes()
 		if len(blockFsJSON) == 0 {
 			break
 		}

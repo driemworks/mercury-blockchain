@@ -87,23 +87,44 @@ func (n *Node) Run(ctx context.Context) error {
 	go n.sync(ctx)
 	go n.mine(ctx)
 
-	// list mailbox (for yourself) - consider renaming? mailbox -> /
-	http.HandleFunc("/mailbox", func(w http.ResponseWriter, r *http.Request) {
-		viewMailboxHandler(w, r, n)
+	// resources are:
+	//	1) state - [{your name, address, balance}, {inbox}, {sent}]
+	//		a) GET inbox(opts) -> opts should allow a limit num of items, option to choose ranges of items, send back pertinent info in headers
+	//		b) GET sent(opts) -> similar to inbox
+	//
+	//	2) peers - [{trusted}, {known}]
+	//	3) tokens - send {"amount": 14433.232}
+	//  4) cid - send {"to": "0x...", "cid": {"cid": "Qm...", "gateway": "infura.io/ipfs"}}
+
+	http.HandleFunc("/inbox", func(w http.ResponseWriter, r *http.Request) {
+		inboxHandler(w, r, n)
 	})
-	// send CID to someone -> renmame /cid/send?
-	http.HandleFunc("/mailbox/send", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/sent", func(w http.ResponseWriter, r *http.Request) {
+		sentHandler(w, r, n)
+	})
+	http.HandleFunc("/info", func(w http.ResponseWriter, r *http.Request) {
+		sentHandler(w, r, n)
+	})
+	// send tokens to an address
+	http.HandleFunc("/send/tokens", func(w http.ResponseWriter, r *http.Request) {
+		sendTokensHandler(w, r, n)
+	})
+	// send CID to someone (costs 1 FTC)
+	http.HandleFunc("/send/cid", func(w http.ResponseWriter, r *http.Request) {
 		addCIDHandler(w, r, n)
 	})
 	// add a PeerNode to the trusted peers slice
-	http.HandleFunc("/friends/add", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/peers/known", func(w http.ResponseWriter, r *http.Request) {
 		addTrustedPeerNodeHandler(w, r, n)
 	})
-	// send tokens to an address
-	http.HandleFunc("/tokens", func(w http.ResponseWriter, r *http.Request) {
-		sendTokensHandler(w, r, n)
+	// add a PeerNode to the trusted peers slice
+	http.HandleFunc("/peers/trusted", func(w http.ResponseWriter, r *http.Request) {
+		addTrustedPeerNodeHandler(w, r, n)
 	})
-	// encrypt some data
+	// add a PeerNode to the trusted peers slice
+	http.HandleFunc("/peers/trusted/add", func(w http.ResponseWriter, r *http.Request) {
+		addTrustedPeerNodeHandler(w, r, n)
+	})
 	// for now, only allow string data, but change that in the future
 	http.HandleFunc("/encrypt", func(w http.ResponseWriter, r *http.Request) {
 		encryptDataHandler(w, r, n)
@@ -112,6 +133,8 @@ func (n *Node) Run(ctx context.Context) error {
 	http.HandleFunc("/decrypt", func(w http.ResponseWriter, r *http.Request) {
 		decryptDataHandler(w, r, n)
 	})
+
+	// THE BELOW COULD BE TRANSLATED TO BE RPC
 	// get the nodes' status
 	http.HandleFunc("/node/status", func(w http.ResponseWriter, r *http.Request) {
 		nodeStatusHandler(w, r, n)
