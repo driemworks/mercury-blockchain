@@ -51,6 +51,7 @@
                         <div style="background:lightGray;font-family:helvetica;border:solid 1px black;margin:10px;padding:5px;">
                             <span style="font-weight:bold;">limit</span>: <span>The maximum number of items to retrieve. Default = none</span>
                             <span style="font-weight:bold;">from</span>: <span>The address to retrieve transactiosn from. Default = all</span>
+                            <span style="font-weight:bold;">Example</span>: localhost:8080/inbox?from=0x5e79986470914df6Cf60a232dE6761Bc862914c5&limit=10
                         </div>         
                 </details>
                 <details>
@@ -77,7 +78,7 @@
         }, 
         {
             "from": "0x5e79986470914df6cf60a232de6761bc862914c5",
-            "cid": { },
+            "cid": {},
             "hash": "699150c5d277d28.............",
             "amount": 10.017
         }]
@@ -104,7 +105,9 @@
                 <details>
                     <summary>Request Parameters</summary>
                         <div style="background:lightGray;font-family:helvetica;border:solid 1px black;margin:10px;padding:5px;">
-                            <span style="font-weight:bold;">limit</span>: <span>The maximum number of items to retrieve</span>
+                            <span style="font-weight:bold;">limit</span>: <span>The maximum number of items to retrieve. Default = none</span>
+                            <span style="font-weight:bold;">from</span>: <span>The address to retrieve transactiosn from. Default = all</span>
+                            <span style="font-weight:bold;">Example</span>: localhost:8080/sent?to=0x5e79986470914df6Cf60a232dE6761Bc862914c5&limit=10
                         </div>         
                 </details>
                 <details>
