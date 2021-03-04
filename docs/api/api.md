@@ -21,6 +21,7 @@
                 &emsp;<span style="font-weight:bold">name</span>: The name of the node<br>
                 &emsp;<span style="font-weight:bold">balance</span>: The node's balance (FTC) <br>
                 <div style="background:lightGray;font-family:helvetica;border:solid 1px black;margin:10px;">
+                    *: should add size of inbox, sent
                     <pre style="padding: 10px;">
 {
     "address": "0x5e79986470914df6cf60a232de6761bc862914c5",
@@ -48,7 +49,8 @@
             <details>
                     <summary>Request Parameters</summary>
                         <div style="background:lightGray;font-family:helvetica;border:solid 1px black;margin:10px;padding:5px;">
-                            <span style="font-weight:bold;">limit</span>: <span>The maximum number of items to retrieve</span>
+                            <span style="font-weight:bold;">limit</span>: <span>The maximum number of items to retrieve. Default = none</span>
+                            <span style="font-weight:bold;">from</span>: <span>The address to retrieve transactiosn from. Default = all</span>
                         </div>         
                 </details>
                 <details>

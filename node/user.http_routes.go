@@ -4,18 +4,13 @@ import (
 	"fmt"
 	"ftp2p/manifest"
 	"ftp2p/wallet"
+	"math"
 	"net/http"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	goCid "github.com/ipfs/go-cid"
 )
-
-type ListInboxRequest struct {
-	Limit int `json:"limit"`
-}
-
-type ListSentRequest struct {
-}
 
 type listInboxResponse struct {
 	Inbox []manifest.InboxItem `json:"inbox"`
@@ -25,24 +20,111 @@ type listSentResponse struct {
 	Sent []manifest.SentItem `json:"sent"`
 }
 
-// '/inbox'
-func inboxHandler(w http.ResponseWriter, r *http.Request, node *Node) {
-	fmt.Println(r.URL.Query()["limit"])
-	from := node.info.Address
-	writeRes(w, listInboxResponse{node.state.Manifest[from].Inbox})
+type listInfoResponse struct {
+	Address string  `json:"address"`
+	Name    string  `json:"name"`
+	Balance float32 `json:"balance"`
 }
 
-// '/sent'
+type peerResponse struct {
+	Address string `json:"address"`
+	Name    string `json:"name"`
+	IP      string `json:"ip"`
+	Port    uint64 `json:"port"`
+}
+
+type knownPeersResponse struct {
+	KnownPeers []peerResponse `json:"known_peers"`
+}
+
+type trustedPeersResponse struct {
+	TrustedPeers []peerResponse `json:"trusted_peers"`
+}
+
+// '/inbox?from={}&limit={}'
+func inboxHandler(w http.ResponseWriter, r *http.Request, node *Node) {
+	fromNode := r.URL.Query().Get("from")
+	limitString := r.URL.Query().Get("limit")
+	limit := -1
+	if limitString != "" {
+		limit, _ = strconv.Atoi(limitString)
+	}
+	thisNode := node.info.Address
+
+	inbox := node.state.Manifest[thisNode].Inbox
+	inboxItems := make([]manifest.InboxItem, 0)
+	if fromNode != "" {
+		for _, item := range inbox {
+			if item.From.Hex() == fromNode {
+				inboxItems = append(inboxItems, item)
+			}
+		}
+	} else {
+		inboxItems = inbox
+	}
+
+	if limit > -1 {
+		inboxItems = inboxItems[0:int(math.Min(float64(limit), float64(len(inboxItems))))]
+	}
+	writeRes(w, listInboxResponse{inboxItems})
+}
+
+// '/sent?from={]&limit={}'
 func sentHandler(w http.ResponseWriter, r *http.Request, node *Node) {
+	fromNode := r.URL.Query().Get("from")
+	limitString := r.URL.Query().Get("limit")
+	limit := -1
+	if limitString != "" {
+		limit, _ = strconv.Atoi(limitString)
+	}
+	thisNode := node.info.Address
+
+	sent := node.state.Manifest[thisNode].Sent
+	sentItems := make([]manifest.SentItem, 0)
+	if fromNode != "" {
+		for _, item := range sent {
+			if item.To.Hex() == fromNode {
+				sentItems = append(sentItems, item)
+			}
+		}
+	} else {
+		sentItems = sent
+	}
+
+	if limit > -1 {
+		sentItems = sentItems[0:int(math.Min(float64(limit), float64(len(sentItems))))]
+	}
+	writeRes(w, listSentResponse{sentItems})
+}
+
+// '/info'
+func infoHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	from := node.info.Address
-	writeRes(w, listSentResponse{node.state.Manifest[from].Sent})
+	writeRes(w, listInfoResponse{from.Hex(), node.name,
+		node.state.Manifest[from].Balance})
+}
+
+func knownPeersHandler(w http.ResponseWriter, r *http.Request, node *Node) {
+	knownPeers := make([]peerResponse, 0, len(node.knownPeers))
+	for _, n := range node.knownPeers {
+		knownPeers = append(knownPeers, peerResponse{n.Address.Hex(), n.Name, n.IP, n.Port})
+	}
+	writeRes(w, knownPeersResponse{knownPeers})
+}
+
+func trustedPeersHandler(w http.ResponseWriter, r *http.Request, node *Node) {
+	trustedPeers := make([]peerResponse, 0, len(node.trustedPeers))
+	for _, n := range node.trustedPeers {
+		trustedPeers = append(trustedPeers, peerResponse{n.Address.Hex(), n.Name, n.IP, n.Port})
+	}
+	writeRes(w, trustedPeersResponse{trustedPeers})
 }
 
 /**
 * TODO - can probably expand this to handle generic state mutation, then restrict the
  use of it based on endpoint parameters
 */
-func addCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
+func sendCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	req := cidAddRequest{}
 	err := readReq(r, &req)
 	if err != nil {
@@ -113,7 +195,6 @@ func addTrustedPeerNodeHandler(w http.ResponseWriter, r *http.Request, node *Nod
 	})
 }
 
-// host:port/tokens POST
 func sendTokensHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	req := sendTokensRequest{}
 	err := readReq(r, &req)
@@ -126,7 +207,7 @@ func sendTokensHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		return
 	}
 	if req.Amount <= 0 {
-		writeErrRes(w, fmt.Errorf("Requested amount should be greater than zero but was %d", req.Amount))
+		writeErrRes(w, fmt.Errorf("requested amount should be greater than zero but was %x", req.Amount))
 		return
 	}
 	from := node.info.Address

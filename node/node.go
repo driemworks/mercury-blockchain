@@ -87,15 +87,6 @@ func (n *Node) Run(ctx context.Context) error {
 	go n.sync(ctx)
 	go n.mine(ctx)
 
-	// resources are:
-	//	1) state - [{your name, address, balance}, {inbox}, {sent}]
-	//		a) GET inbox(opts) -> opts should allow a limit num of items, option to choose ranges of items, send back pertinent info in headers
-	//		b) GET sent(opts) -> similar to inbox
-	//
-	//	2) peers - [{trusted}, {known}]
-	//	3) tokens - send {"amount": 14433.232}
-	//  4) cid - send {"to": "0x...", "cid": {"cid": "Qm...", "gateway": "infura.io/ipfs"}}
-
 	http.HandleFunc("/inbox", func(w http.ResponseWriter, r *http.Request) {
 		inboxHandler(w, r, n)
 	})
@@ -103,7 +94,7 @@ func (n *Node) Run(ctx context.Context) error {
 		sentHandler(w, r, n)
 	})
 	http.HandleFunc("/info", func(w http.ResponseWriter, r *http.Request) {
-		sentHandler(w, r, n)
+		infoHandler(w, r, n)
 	})
 	// send tokens to an address
 	http.HandleFunc("/send/tokens", func(w http.ResponseWriter, r *http.Request) {
@@ -111,15 +102,15 @@ func (n *Node) Run(ctx context.Context) error {
 	})
 	// send CID to someone (costs 1 FTC)
 	http.HandleFunc("/send/cid", func(w http.ResponseWriter, r *http.Request) {
-		addCIDHandler(w, r, n)
+		sendCIDHandler(w, r, n)
 	})
 	// add a PeerNode to the trusted peers slice
 	http.HandleFunc("/peers/known", func(w http.ResponseWriter, r *http.Request) {
-		addTrustedPeerNodeHandler(w, r, n)
+		knownPeersHandler(w, r, n)
 	})
 	// add a PeerNode to the trusted peers slice
 	http.HandleFunc("/peers/trusted", func(w http.ResponseWriter, r *http.Request) {
-		addTrustedPeerNodeHandler(w, r, n)
+		trustedPeersHandler(w, r, n)
 	})
 	// add a PeerNode to the trusted peers slice
 	http.HandleFunc("/peers/trusted/add", func(w http.ResponseWriter, r *http.Request) {
