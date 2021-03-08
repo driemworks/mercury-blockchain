@@ -1,6 +1,8 @@
 package manifest
 
 import (
+	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -8,7 +10,13 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 )
+
+func getKeystoreDirPath(datadir string) string {
+	return filepath.Join(datadir, "keystore")
+}
 
 func getDatabaseDirPath(datadir string) string {
 	return filepath.Join(datadir, "manifest")
@@ -25,27 +33,55 @@ func getBlocksDbFilePath(datadir string, isTemp bool) string {
 	return filepath.Join(getDatabaseDirPath(datadir), "block.db")
 }
 
+func getEncryptionKeysFilePath(datadir string) string {
+	return filepath.Join(getKeystoreDirPath(datadir), "keys.json")
+}
+
 func initDataDirIfNotExists(dataDir string) error {
-	if fileExists(getGenesisJsonFilePath(dataDir)) {
-		return nil
+	// if the genesis.json file dne, create it
+	if !fileExists(getGenesisJsonFilePath(dataDir)) {
+		// return nil
+		// create root directory for our db (create parents dirs if needed)
+		// ensure root dir exists
+		if !fileExists(getDatabaseDirPath(dataDir)) {
+			if err := os.MkdirAll(getDatabaseDirPath(dataDir), os.ModePerm); err != nil {
+				return err
+			}
+		}
+		// write genesis.json
+		if err := writeGenesisToDisk(getGenesisJsonFilePath(dataDir)); err != nil {
+			return err
+		}
 	}
 
-	if err := os.MkdirAll(getDatabaseDirPath(dataDir), os.ModePerm); err != nil {
-		return err
-	}
-
-	if err := writeGenesisToDisk(getGenesisJsonFilePath(dataDir)); err != nil {
-		return err
-	}
-
-	if err := writeEmptyBlocksDbToDisk(getBlocksDbFilePath(dataDir, false)); err != nil {
-		return err
+	if !fileExists(getBlocksDbFilePath(dataDir, false)) {
+		if !fileExists(getDatabaseDirPath(dataDir)) {
+			if err := os.MkdirAll(getDatabaseDirPath(dataDir), os.ModePerm); err != nil {
+				return err
+			}
+		}
+		// write empty block.db
+		if err := writeEmptyFileToDisk(getBlocksDbFilePath(dataDir, false)); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func writeEmptyBlocksDbToDisk(path string) error {
+func WriteEncryptionKeys(datadir string, key keystore.CryptoJSON) error {
+	if !fileExists(getEncryptionKeysFilePath(datadir)) {
+		json, err := json.Marshal(key)
+		fmt.Printf("saving json ... %x \n", json)
+		if err != nil {
+			return err
+		}
+		ioutil.WriteFile(getEncryptionKeysFilePath(datadir), json, os.ModePerm)
+	}
+	return nil
+}
+
+func writeEmptyFileToDisk(path string) error {
 	return ioutil.WriteFile(path, []byte(""), os.ModePerm)
 }
 

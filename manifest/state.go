@@ -205,7 +205,7 @@ func (s *State) orphanLatestBlock() error {
 	latestBlockNumber := s.latestBlock.Header.Number
 	s.Close()
 	// clear the temp file
-	writeEmptyBlocksDbToDisk(getBlocksDbFilePath(s.datadir, true))
+	writeEmptyFileToDisk(getBlocksDbFilePath(s.datadir, true))
 	tempDbFile, err := os.OpenFile(getBlocksDbFilePath(s.datadir, true), os.O_APPEND|os.O_RDWR, 0600)
 	blockDbFile, err := os.OpenFile(s.dbFile.Name(), os.O_APPEND|os.O_RDWR, 0600)
 	if err != nil {
@@ -231,7 +231,7 @@ func (s *State) orphanLatestBlock() error {
 		numBlocks = numBlocks + 1 // could probably just use block number for this...
 	}
 	// clear block.db
-	writeEmptyBlocksDbToDisk(getBlocksDbFilePath(s.datadir, false))
+	writeEmptyFileToDisk(getBlocksDbFilePath(s.datadir, false))
 	tempDbFile, err = os.OpenFile(getBlocksDbFilePath(s.datadir, true), os.O_APPEND|os.O_RDWR, 0600)
 	tempFileScanner := bufio.NewScanner(tempDbFile)
 	blockToWrite := latestBlockNumber - 1

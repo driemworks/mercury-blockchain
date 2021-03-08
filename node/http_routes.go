@@ -90,62 +90,6 @@ type AddTrustedPeerNodeRequest struct {
 	TcpAddress string `json:"tcp_address"`
 }
 
-func encryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
-	req := encryptDataRequest{}
-	err := readReq(r, &req)
-	if err != nil {
-		writeErrRes(w, err)
-		return
-	}
-	// TODO - condense/cleanup these params
-	encryptedData, err := wallet.Encrypt(
-		wallet.GetKeystoreDirPath(node.datadir),
-		req.FromPwd,
-		node.info.Address,
-		manifest.NewAddress(req.To).Hash().Bytes(),
-		[]byte(req.Data),
-		wallet.X25519,
-	)
-	if err != nil {
-		writeErrRes(w, err)
-		return
-	}
-	writeRes(w, EncryptDataResponse{EncryptedData: encryptedData})
-}
-
-func decryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
-	req := DecryptDataRequest{}
-	err := readReq(r, &req)
-	if err != nil {
-		writeErrRes(w, err)
-		return
-	}
-	decryptedData, err := wallet.Decrypt(
-		wallet.GetKeystoreDirPath(node.datadir),
-		node.info.Address,
-		req.FromPwd,
-		&req.EncryptedData,
-	)
-	// prvKey, err := wallet.RecoverPrivateKey(
-	// 	wallet.GetKeystoreDirPath(node.datadir),
-	// 	req.FromPwd,
-	// 	node.info.Address,
-	// )
-	// if err != nil {
-	// 	writeErrRes(w, err)
-	// 	return
-	// }
-	// decryptedData, err := wallet.Decrypt(
-	// 	prvKey,
-	// 	&req.EncryptedData,
-	// )
-	if err != nil {
-		writeErrRes(w, err)
-		return
-	}
-	writeRes(w, DecryptDataResponse{string(decryptedData)})
-}
-
 /**
 *
  */
