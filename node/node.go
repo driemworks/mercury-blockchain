@@ -17,12 +17,13 @@ const miningIntervalSeconds = 10
 const syncIntervalSeconds = 30
 
 type PeerNode struct {
-	Name        string         `json:"name"`
-	IP          string         `json:"ip"`
-	Port        uint64         `json:"port"`
-	IsBootstrap bool           `json:"is_bootstrap"`
-	Address     common.Address `json:"address"`
-	connected   bool
+	Name                string         `json:"name"`
+	IP                  string         `json:"ip"`
+	Port                uint64         `json:"port"`
+	IsBootstrap         bool           `json:"is_bootstrap"`
+	Address             common.Address `json:"address"`
+	EncryptionPublicKey string         `json:"encryption_public_key"`
+	connected           bool
 }
 
 func (p PeerNode) TcpAddress() string {
@@ -43,10 +44,9 @@ type Node struct {
 	newPendingTXs   chan manifest.SignedTx
 	isMining        bool
 	name            string
-	// wallet          wallet.Wallet
 }
 
-func NewNode(name string, datadir string, ip string, port uint64, address common.Address, bootstrap PeerNode) *Node {
+func NewNode(name string, datadir string, ip string, port uint64, address common.Address, encryptionPublicKey string, bootstrap PeerNode) *Node {
 	knownPeers := make(map[string]PeerNode)
 	knownPeers[bootstrap.TcpAddress()] = bootstrap
 	return &Node{
@@ -56,7 +56,7 @@ func NewNode(name string, datadir string, ip string, port uint64, address common
 		port:            port,
 		knownPeers:      knownPeers,
 		trustedPeers:    make(map[string]PeerNode),
-		info:            NewPeerNode(name, ip, port, false, address, true),
+		info:            NewPeerNode(name, ip, port, false, address, encryptionPublicKey, true),
 		pendingTXs:      make(map[string]manifest.SignedTx),
 		archivedTXs:     make(map[string]manifest.SignedTx),
 		newSyncedBlocks: make(chan manifest.Block),
@@ -65,8 +65,8 @@ func NewNode(name string, datadir string, ip string, port uint64, address common
 	}
 }
 
-func NewPeerNode(name string, ip string, port uint64, isBootstrap bool, address common.Address, connected bool) PeerNode {
-	return PeerNode{name, ip, port, isBootstrap, address, connected}
+func NewPeerNode(name string, ip string, port uint64, isBootstrap bool, address common.Address, encryptionPublicKey string, connected bool) PeerNode {
+	return PeerNode{name, ip, port, isBootstrap, address, encryptionPublicKey, connected}
 }
 
 /**
@@ -77,8 +77,7 @@ func (n *Node) Run(ctx context.Context) error {
 	// s.Start()
 	fmt.Println(fmt.Sprintf("Listening on: %s:%d", n.info.IP, n.info.Port))
 	state, err := manifest.NewStateFromDisk(n.datadir)
-	// fmt.Println("Succesfully loaded the state from disk")
-
+	// trusted peers will need to be tracked as transactions, so that we can recover/rebuild when starting node
 	if err != nil {
 		return err
 	}
@@ -124,18 +123,16 @@ func (n *Node) Run(ctx context.Context) error {
 	http.HandleFunc("/decrypt", func(w http.ResponseWriter, r *http.Request) {
 		decryptDataHandler(w, r, n)
 	})
-
-	// THE BELOW COULD BE TRANSLATED TO BE RPC
-	// get the nodes' status
+	// THE BELOW COULD BE RPC
+	// get node status
 	http.HandleFunc("/node/status", func(w http.ResponseWriter, r *http.Request) {
 		nodeStatusHandler(w, r, n)
 	})
-	/* sync endpoints => these should not be able to be called without some proper auth */
-	// peer sync
+	// peer/block/tx sync
 	http.HandleFunc("/node/sync", func(w http.ResponseWriter, r *http.Request) {
 		syncHandler(w, r, n)
 	})
-	// block sync
+	// add to known peers
 	http.HandleFunc("/node/peer", func(w http.ResponseWriter, r *http.Request) {
 		addPeerHandler(w, r, n)
 	})

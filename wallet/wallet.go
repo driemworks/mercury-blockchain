@@ -5,11 +5,13 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"ftp2p/manifest"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -80,22 +82,36 @@ func NewKeystoreAccount(dataDir, password string) (common.Address, error) {
 
 func generateEncryptionKeys(datadir string, privateKey []byte) error {
 	PublicKey, PrivateKey, _ := box.GenerateKey(rand.Reader)
-	fmt.Printf("GENERATED PUBLIC ENCRYPTION KEY: %x\n", PublicKey)
-	fmt.Printf("GENERATED PRIVATE ENCRYPTION KEY: %x\n", PrivateKey)
 	_joinedKeys := [64]byte{}
 	copy(_joinedKeys[:32], PublicKey[:])
 	copy(_joinedKeys[32:], PrivateKey[:])
-	var joinedKeys []byte
-	copy(joinedKeys[:], _joinedKeys[:])
 	// creates a CryptoJSON object
-	encryptedEncryptionKeys, err := keystore.EncryptDataV3(joinedKeys, privateKey, keystore.StandardScryptN, keystore.StandardScryptP)
+	encryptedEncryptionKeys, err := keystore.EncryptDataV3(
+		_joinedKeys[:], privateKey, keystore.StandardScryptN, keystore.StandardScryptP)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("ENCRYPTED ENCRYPTION KEYS: %x\n", encryptedEncryptionKeys)
 	manifest.WriteEncryptionKeys(datadir, encryptedEncryptionKeys)
-
 	return nil
+}
+
+func LoadEncryptionKeys(datadir string, password string) ([]byte, error) {
+	// load keys.json file
+	encryptionKeysJsonFile, err := os.OpenFile(manifest.GetEncryptionKeysFilePath(datadir), os.O_RDONLY, 0600)
+	if err != nil {
+		return []byte{}, err
+	}
+	bytes, _ := ioutil.ReadAll(encryptionKeysJsonFile)
+	var unmarshalled keystore.CryptoJSON
+	json.Unmarshal(bytes, &unmarshalled)
+	// decrypt the ciphertext
+	decrypted, err := keystore.DecryptDataV3(unmarshalled, password)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	defer encryptionKeysJsonFile.Close()
+	return decrypted, nil
 }
 
 // GetEncryptionPublicKey returns user's public Encryption key derived from privateKey Ethereum key
@@ -110,21 +126,23 @@ func GetEncryptionPublicKey(receiverAddress string) string {
 }
 
 // Encrypt plain data
-func Encrypt(receiverPublicKey [32]byte, data []byte, version string) (*EncryptedData, error) {
+func Encrypt(senderPublicKey, senderPrivateKey, receiverPublicKey [32]byte, data []byte, version string) (*EncryptedData, error) {
+	// fmt.Printf("senderPublicKey: %x\n", senderPublicKey)
+	// fmt.Printf("senderPrivateKey: %x\n", senderPrivateKey)
+	// fmt.Printf("receiverPublicKey: %x\n", receiverPublicKey)
 	switch version {
 	case X25519:
-		ephemeralPublic, ephemeralPrivate, _ := box.GenerateKey(rand.Reader)
 		var nonce [24]byte
 		if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
 			return nil, err
 		}
 
-		out := box.Seal(nil, data, &nonce, &receiverPublicKey, ephemeralPrivate)
+		out := box.Seal(nil, data, &nonce, &receiverPublicKey, &senderPrivateKey)
 
 		return &EncryptedData{
 			Version:        version,
 			Nonce:          base64.StdEncoding.EncodeToString(nonce[:]),
-			EphemPublicKey: base64.StdEncoding.EncodeToString(ephemeralPublic[:]),
+			EphemPublicKey: base64.StdEncoding.EncodeToString(senderPublicKey[:]),
 			Ciphertext:     base64.StdEncoding.EncodeToString(out),
 		}, nil
 	default:
@@ -136,7 +154,6 @@ func Encrypt(receiverPublicKey [32]byte, data []byte, version string) (*Encrypte
 func Decrypt(receiverPrivateKey [32]byte, encryptedData *EncryptedData) ([]byte, error) {
 	switch encryptedData.Version {
 	case X25519:
-		// assemble decryption parameters
 		nonce, _ := base64.StdEncoding.DecodeString(encryptedData.Nonce)
 		ciphertext, _ := base64.StdEncoding.DecodeString(encryptedData.Ciphertext)
 		ephemPublicKey, _ := base64.StdEncoding.DecodeString(encryptedData.EphemPublicKey)
@@ -146,7 +163,8 @@ func Decrypt(receiverPrivateKey [32]byte, encryptedData *EncryptedData) ([]byte,
 
 		nonce24 := [24]byte{}
 		copy(nonce24[:], nonce[:24])
-
+		// fmt.Printf("receiverPrivateKey: %x\n", receiverPrivateKey)
+		// fmt.Printf("publicKey: %x\n", publicKey)
 		decryptedMessage, ok := box.Open(nil, ciphertext, &nonce24, &publicKey, &receiverPrivateKey)
 		if !ok {
 			return []byte{}, errors.New("Failed to decrypt the message")
@@ -158,22 +176,6 @@ func Decrypt(receiverPrivateKey [32]byte, encryptedData *EncryptedData) ([]byte,
 }
 
 func SignTxWithKeystoreAccount(tx manifest.Tx, address common.Address, pwd, keystoreDir string) (manifest.SignedTx, error) {
-	// ks := keystore.NewKeyStore(keystoreDir, keystore.StandardScryptN, keystore.StandardScryptP)
-
-	// ksAccount, err := ks.Find(accounts.Account{Address: acc})
-	// if err != nil {
-	// 	return manifest.SignedTx{}, err
-	// }
-	// ksAccountJson, err := ioutil.ReadFile(ksAccount.URL.Path)
-	// if err != nil {
-	// 	return manifest.SignedTx{}, err
-	// }
-
-	// key, err := keystore.DecryptKey(ksAccountJson, p wd)
-	// if err != nil {
-	// 	return manifest.SignedTx{}, err
-	// }
-
 	keystoreJSON, err := recoverKeystoreJSON(keystoreDir, address)
 	if err != nil {
 		return manifest.SignedTx{}, err

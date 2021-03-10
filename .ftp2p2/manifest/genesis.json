@@ -3,7 +3,7 @@
     "genesis_time": "2021-02-012T00:00:00.000000000Z",
     "chain_id": "driemworks-blockchain",
     "manifest": {
-        "0x5e79986470914df6Cf60a232dE6761Bc862914c5": {
+        "0x9F0d31dFE801cc74ED9e50F06aDC7B168FF2F35b": {
 			"alias": "tony",
             "sent": [],
             "inbox": [],

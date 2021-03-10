@@ -8,7 +8,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -59,7 +58,7 @@ func walletPrintPrivKeyCmd() *cobra.Command {
 		Short: "Unlocks keystore file and prints the Private + Public keys.",
 		Run: func(cmd *cobra.Command, args []string) {
 			ksFile, _ := cmd.Flags().GetString(flagKeystoreFile)
-			password := getPassPhrase("Please enter a password to decrypt the wallet: ", false)
+			password := getPassPhrase("Please enter a password to decrypt the wallet: ", true)
 
 			keyJson, err := ioutil.ReadFile(ksFile)
 			if err != nil {
@@ -80,20 +79,4 @@ func walletPrintPrivKeyCmd() *cobra.Command {
 	addKeystoreFlag(cmd)
 
 	return cmd
-}
-
-// TODO  this is a bit broken...
-func getPassPhrase(prompt string, confirmation bool) string {
-	fmt.Print(prompt)
-	var password string
-	fmt.Scanln(&password)
-	if confirmation {
-		fmt.Print("Repeat password: ")
-		var confirmationPassword string
-		fmt.Scanln(&confirmationPassword)
-		if password != confirmationPassword {
-			utils.Fatalf("Password should match")
-		}
-	}
-	return password
 }

@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"ftp2p/manifest"
 	"net/http"
@@ -157,13 +158,14 @@ func (n *Node) joinKnownPeers(peer PeerNode) error {
 	}
 
 	url := fmt.Sprintf(
-		"http://%s%s?%s=%s&%s=%d&%s=%s&%s=%s",
+		"http://%s%s?%s=%s&%s=%d&%s=%s&%s=%s&%s=%s",
 		peer.TcpAddress(),
 		endpointAddPeer,
 		endpointAddPeerQueryKeyIP, n.info.IP,
 		endpointAddPeerQueryKeyPort, n.info.Port,
 		endpointAddPeerQueryKeyMiner, n.info.Address,
 		endpointAddNameQueryKeyName, n.info.Name,
+		"publicKey", base64.StdEncoding.EncodeToString([]byte(n.info.EncryptionPublicKey)),
 	)
 
 	res, err := http.Get(url)

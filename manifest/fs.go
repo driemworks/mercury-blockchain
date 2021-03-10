@@ -2,7 +2,6 @@ package manifest
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -33,7 +32,7 @@ func getBlocksDbFilePath(datadir string, isTemp bool) string {
 	return filepath.Join(getDatabaseDirPath(datadir), "block.db")
 }
 
-func getEncryptionKeysFilePath(datadir string) string {
+func GetEncryptionKeysFilePath(datadir string) string {
 	return filepath.Join(getKeystoreDirPath(datadir), "keys.json")
 }
 
@@ -65,18 +64,16 @@ func initDataDirIfNotExists(dataDir string) error {
 			return err
 		}
 	}
-
 	return nil
 }
 
 func WriteEncryptionKeys(datadir string, key keystore.CryptoJSON) error {
-	if !fileExists(getEncryptionKeysFilePath(datadir)) {
-		json, err := json.Marshal(key)
-		fmt.Printf("saving json ... %x \n", json)
+	if !fileExists(GetEncryptionKeysFilePath(datadir)) {
+		_json, err := json.Marshal(key)
 		if err != nil {
 			return err
 		}
-		ioutil.WriteFile(getEncryptionKeysFilePath(datadir), json, os.ModePerm)
+		ioutil.WriteFile(GetEncryptionKeysFilePath(datadir), _json, os.ModePerm)
 	}
 	return nil
 }

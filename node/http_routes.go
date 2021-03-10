@@ -135,13 +135,14 @@ func addPeerHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	peerPortRaw := r.URL.Query().Get("port")
 	peerName := r.URL.Query().Get("name")
 	minerRaw := r.URL.Query().Get("miner")
+	encryptionPublicKey := r.URL.Query().Get("publicKey")
 
 	peerPort, err := strconv.ParseUint(peerPortRaw, 10, 32)
 	if err != nil {
 		writeRes(w, AddPeerRes{false, err.Error()})
 		return
 	}
-	peer := NewPeerNode(peerName, peerIP, peerPort, false, manifest.NewAddress(minerRaw), true)
+	peer := NewPeerNode(peerName, peerIP, peerPort, false, manifest.NewAddress(minerRaw), encryptionPublicKey, true)
 	node.AddPeer(peer)
 	fmt.Printf("Peer "+rainbow.Green("'%s'")+" was added into KnownPeers\n", peer.TcpAddress())
 	writeRes(w, AddPeerRes{true, ""})

@@ -1,13 +1,11 @@
 package wallet
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
 	"ftp2p/manifest"
-	"io"
 	"io/ioutil"
 	"math/big"
 	"testing"
@@ -181,117 +179,25 @@ func TestSignForgedTxWithKeystoreAccount(t *testing.T) {
 	}
 }
 
-func TestSealOpen(t *testing.T) {
-	publicKey1, privateKey1, _ := box.GenerateKey(rand.Reader)
-	publicKey2, privateKey2, _ := box.GenerateKey(rand.Reader)
-
-	if *privateKey1 == *privateKey2 {
-		t.Fatalf("private keys are equal!")
-	}
-	if *publicKey1 == *publicKey2 {
-		t.Fatalf("public keys are equal!")
-	}
-	message := []byte("test message")
-	var nonce [24]byte
-
-	out := box.Seal(nil, message, &nonce, publicKey1, privateKey2)
-	opened, ok := box.Open(nil, out, &nonce, publicKey2, privateKey1)
-	if !ok {
-		t.Fatalf("failed to open box")
-	}
-
-	if !bytes.Equal(opened, message) {
-		t.Fatalf("got %x, want %x", opened, message)
-	}
-
-	for i := range out {
-		out[i] ^= 0x40
-		_, ok := box.Open(nil, out, &nonce, publicKey2, privateKey1)
-		if ok {
-			t.Fatalf("opened box with byte %d corrupted", i)
-		}
-		out[i] ^= 0x40
-	}
-}
-
-type Account struct {
-	ethereumPrivateKey   string
-	encryptionPrivateKey string
-	encryptionPublicKey  string
-}
-
-type Message struct {
-	data string
-}
-
-var bob = Account{
-	ethereumPrivateKey:   "7e5374ec2ef0d91761a6e72fdf8f6ac665519bfdf6da0a2329cf0d804514b816",
-	encryptionPrivateKey: "flN07C7w2Rdhpucv349qxmVRm/322gojKc8NgEUUuBY=",
-	encryptionPublicKey:  "C5YMNdqE4kLgxQhJO1MfuQcHP5hjVSXzamzd/TxlR0U=",
-}
-
-var encryptedData = EncryptedData{
-	Version:        "x25519-xsalsa20-poly1305",
-	Nonce:          "1dvWO7uOnBnO7iNDJ9kO9pTasLuKNlej",
-	EphemPublicKey: "FBH1/pAEHOOW14Lu3FWkgV3qOEcuL78Zy+qW1RwzMXQ=",
-	Ciphertext:     "f8kBcl/NCyf3sybfbwAKk/np2Bzt9lRVkZejr6uh5FgnNlH/ic62DZzy",
-}
-
-var secretMessage = "This is a test message "
-
-func Test_GetEncryptionPublicKey(t *testing.T) {
-	result := GetEncryptionPublicKey(bob.ethereumPrivateKey)
-	assert.Equal(t, result, bob.encryptionPublicKey)
-}
-
-func Test_Encrypt(t *testing.T) {
-	var publicKey [32]byte
-	copy(publicKey[:], bob.encryptionPublicKey)
-	encrypted, err := Encrypt(
-		publicKey,
-		[]byte(secretMessage),
-		"x25519-xsalsa20-poly1305",
-	)
-
-	assert.Nil(t, err)
-	assert.Equal(t, "x25519-xsalsa20-poly1305", encrypted.Version)
-	assert.NotEmpty(t, encrypted.Nonce)
-	assert.NotEmpty(t, encrypted.Ciphertext)
-	assert.NotEmpty(t, encrypted.EphemPublicKey)
-
-	var privKey [32]byte
-	copy(privKey[:], []byte(bob.ethereumPrivateKey))
-	decrypted, err := Decrypt(privKey, encrypted)
-	assert.Nil(t, err)
-	assert.Equal(t, secretMessage, string(decrypted))
-
-}
-
-func Test_Decrypt(t *testing.T) {
-	var privKey [32]byte
-	copy(privKey[:], []byte(bob.ethereumPrivateKey))
-	decrypted, err := Decrypt(privKey, &encryptedData)
-	assert.Nil(t, err)
-	assert.Equal(t, secretMessage, string(decrypted))
-}
 func Test_Encrypt_Decrypt_Multi_Node(t *testing.T) {
 	message := "Hi this is a message"
 	AlicePublicKey, AlicePrivateKey, _ := box.GenerateKey(rand.Reader)
-	// assert.Nil(t, AlicePublicKey)
-	// fmt.Printf("Alice private %x\n", *AlicePrivateKey)
-	// fmt.Printf("Alice public (x-co-ord) %x\n", *AlicePublicKey)
 	BobPublicKey, BobPrivateKey, _ := box.GenerateKey(rand.Reader)
-	// fmt.Printf("\nBob private %x\n", *BobPrivateKey)
-	// fmt.Printf("Bob public (x-co-ord) %x\n", *BobPublicKey)
-	var nonce [24]byte
-	io.ReadFull(rand.Reader, nonce[:])
-	msg := []byte(message)
-	encrypted := box.Seal(nonce[:], msg, &nonce, BobPublicKey, AlicePrivateKey)
-	var decryptNonce [24]byte
-	copy(decryptNonce[:], encrypted[:24])
-	decrypted, _ := box.Open(nil, encrypted[24:], &decryptNonce, AlicePublicKey, BobPrivateKey)
-	// fmt.Printf("\nMessage: %s\n", message)
-	// fmt.Printf("\nEncrypted: %x\n\n", encrypted)
-	// fmt.Printf("Decrypted %s", string(decrypted))
+	// alice -(msg)-> bob
+	encrypted, err := Encrypt(
+		*AlicePublicKey,
+		*AlicePrivateKey,
+		*BobPublicKey,
+		[]byte(message),
+		"x25519-xsalsa20-poly1305",
+	)
+	assert.Nil(t, err)
+	assert.NotNil(t, encrypted)
+	decrypted, err := Decrypt(
+		*BobPrivateKey, encrypted,
+	)
+	assert.Nil(t, err)
+	assert.NotNil(t, decrypted)
 	assert.Equal(t, message, string(decrypted))
+
 }

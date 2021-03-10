@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"ftp2p/manifest"
 	"ftp2p/node"
+	"ftp2p/wallet"
 	"math/rand"
 	"os"
 
@@ -24,6 +25,8 @@ func runCmd() *cobra.Command {
 			port, _ := cmd.Flags().GetUint64(flagPort)
 			bootstrapIP, _ := cmd.Flags().GetString(flagBootstrapIP)
 			bootstrapPort, _ := cmd.Flags().GetUint64(flagBootstrapPort)
+
+			password := getPassPhrase("Password: ", false)
 
 			fmt.Println("")
 			fmt.Println("")
@@ -45,18 +48,27 @@ func runCmd() *cobra.Command {
 				bootstrapIP,
 				bootstrapPort,
 				true,
-				manifest.NewAddress("0x5e79986470914df6Cf60a232dE6761Bc862914c5"),
+				manifest.NewAddress("0x9F0d31dFE801cc74ED9e50F06aDC7B168FF2F35b"),
+				"dlpFQpJJ0P0JwwBjHpaPsDqheGHAhUuYjWl9/gs7rlY=",
 				false,
 			)
+			// decrypt encryption public key
+			keys, err := wallet.LoadEncryptionKeys(getDataDirFromCmd(cmd), password)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			publicKey := keys[:32]
 			n := node.NewNode(name, getDataDirFromCmd(cmd), ip, port,
-				manifest.NewAddress(miner), bootstrap)
-			err := n.Run(context.Background())
+				manifest.NewAddress(miner), string(publicKey), bootstrap)
+			err = n.Run(context.Background())
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)
 			}
 		},
 	}
+
 	addDefaultRequiredFlags(runCmd)
 
 	runCmd.Flags().String(flagName, fmt.Sprintf("user-%d", rand.Int()), "Your username")

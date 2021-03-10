@@ -5,6 +5,7 @@ import (
 	"ftp2p/manifest"
 	"os"
 
+	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -53,4 +54,19 @@ func addDefaultRequiredFlags(cmd *cobra.Command) {
 
 func incorrectUsageErr() error {
 	return fmt.Errorf("incorrect usage")
+}
+
+func getPassPhrase(prompt string, confirmation bool) string {
+	fmt.Print(prompt)
+	var password string
+	fmt.Scanln(&password)
+	if confirmation {
+		fmt.Print("Repeat password: ")
+		var confirmationPassword string
+		fmt.Scanln(&confirmationPassword)
+		if password != confirmationPassword {
+			utils.Fatalf("Password should match")
+		}
+	}
+	return password
 }
