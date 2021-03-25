@@ -1,14 +1,23 @@
 # FTP2P
-FTP2P is a blockchain for sharing [CID's](https://docs.ipfs.io/concepts/content-addressing/) with peers. If you're familiar with pinning services (such as [this one](https://pinata.cloud/)), then you can best think of FTP2P as a inverted pinning service. FTP2P does not have any direct integration or dependency on IPFS. 
+FTP2P is a blockchain for sharing [CID's](https://docs.ipfs.io/concepts/content-addressing/) with peers across ipfs gateways.
 
 ## Getting Started
+
+### Summary
+
+
+If you're familiar with pinning services (such as [this one](https://pinata.cloud/)) then you can best think of FTP2P as an inverted pinning service. FTP2P does not have any direct integration or dependency on IPFS.
 
 ### Pre requisites
 - install `go`
 - install `ipfs` (recommended)
 
 ### Installation 
-- navigate to the root directory `ftp2p/` and run `go install ./cli/...` to install the go modules
+Install f2p2p using:
+```
+go get github.com/driemworks/ftp2p/cli/...
+```
+(Recommnded) Install ftp2p from the source by cloning this repo and run `go install ./cli/...` from the root directory `ftp2p/`.
 
 ## Usage
 ### CLI commands
@@ -38,6 +47,8 @@ FTP2P is a blockchain for sharing [CID's](https://docs.ipfs.io/concepts/content-
   ```
 
 ## API
+Note: In order to use the API a node must be running. 
+
 See the [API documentation](https://github.com/driemworks/ftp2p/blob/master/docs/api/api.md)
 
 ### Node/Sync API
@@ -48,7 +59,15 @@ See the [API documentation](https://github.com/driemworks/ftp2p/blob/master/docs
 
 
 ### Development
-TODO 
+If you'd like to contribute send me an email at tonyrriemer@gmail.com or message me on discord: driemworks#1849
+
+#### Future Features
+[A comprehensive list of planned features will be added here]
+- integrate with gojsonq
+- expose API via a CLI 
+- /node/* endpoints to rpc
+- complete encrypt/decrypt functionality (+ expose api/cli)
+- enhance 'transactions' to represent generic state mutation request
 
 ### Testing
 - example: $ go test ./node/ -test.v -test.run ^TestValidBlockHash$ 
