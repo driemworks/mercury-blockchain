@@ -73,10 +73,8 @@ func NewBlock(parent Hash, time uint64, number uint64, txs []SignedTx, nonce uin
 */
 func IsBlockHashValid(hash Hash) bool {
 	return fmt.Sprintf("%x", hash[0]) == "1" &&
-		fmt.Sprintf("%x", hash[1]) == "0"
-	//  &&
-	// fmt.Sprintf("%x", hash[2]) == "1"
-	// &&
-	// 	fmt.Sprintf("%x", hash[3]) != "0"
+		fmt.Sprintf("%x", hash[1]) == "0" &&
+		fmt.Sprintf("%x", hash[2]) == "1" &&
+		fmt.Sprintf("%x", hash[3]) != "0"
 
 }

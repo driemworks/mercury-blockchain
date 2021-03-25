@@ -14,10 +14,11 @@ func NewAddress(value string) common.Address {
 	return common.HexToAddress(value)
 }
 
+// TODO - need to generalize
 type Tx struct {
-	From   common.Address `json: "from"`
-	To     common.Address `json: "to"`
-	CID    CID            `json: "cid"`
+	From   common.Address `json:"from"`
+	To     common.Address `json:"to"`
+	CID    CID            `json:"cid"`
 	Nonce  uint           `json:"nonce"`
 	Time   uint64         `json:"time"`
 	Amount float32        `json:"amount"`
@@ -35,13 +36,6 @@ func NewTx(from common.Address, to common.Address, cid CID, nonce uint, amount f
 func NewSignedTx(tx Tx, sig []byte) SignedTx {
 	return SignedTx{tx, sig}
 }
-
-// func (t Tx) IsReward() bool {
-// 	// what would be a meaningful reward in the context of file sharing?
-// 	// I suppose... the "in-app" currency maybe?
-// 	// maybe there could be different tiers? based on number of transactions/day
-// 	return t.Data == "reward"
-// }
 
 func (t Tx) Hash() (Hash, error) {
 	txJson, err := json.Marshal(t)

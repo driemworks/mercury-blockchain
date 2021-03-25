@@ -13,7 +13,7 @@ import (
 	"github.com/raphamorim/go-rainbow"
 )
 
-const miningIntervalSeconds = 10
+const miningIntervalSeconds = 45
 const syncIntervalSeconds = 30
 
 type PeerNode struct {
@@ -46,7 +46,9 @@ type Node struct {
 	name            string
 }
 
-func NewNode(name string, datadir string, ip string, port uint64, address common.Address, encryptionPublicKey string, bootstrap PeerNode) *Node {
+func NewNode(name string, datadir string, ip string, port uint64,
+	address common.Address, encryptionPublicKey string,
+	bootstrap PeerNode) *Node {
 	knownPeers := make(map[string]PeerNode)
 	knownPeers[bootstrap.TcpAddress()] = bootstrap
 	return &Node{
@@ -77,7 +79,7 @@ func (n *Node) Run(ctx context.Context) error {
 	// s.Start()
 	fmt.Println(fmt.Sprintf("Listening on: %s:%d", n.info.IP, n.info.Port))
 	state, err := manifest.NewStateFromDisk(n.datadir)
-	// trusted peers will need to be tracked as transactions, so that we can recover/rebuild when starting node
+	// trusted peers will need to be tracked as transactions, so that we can recover/rebuild when starting node?
 	if err != nil {
 		return err
 	}
@@ -85,6 +87,34 @@ func (n *Node) Run(ctx context.Context) error {
 	n.state = state
 	go n.sync(ctx)
 	go n.mine(ctx)
+	/*
+		APPEND OPERATIONS
+	*/
+	http.HandleFunc("/publish", func(w http.ResponseWriter, r *http.Request) {
+		sendCIDHandler(w, r, n)
+	})
+	// add a PeerNode to the trusted peers slice
+	http.HandleFunc("/peers/trusted/add", func(w http.ResponseWriter, r *http.Request) {
+		addTrustedPeerNodeHandler(w, r, n)
+	})
+	/*
+		ENCRYPTION OPERATIONS
+	*/
+	// for now, only allow string data, but change that in the future
+	http.HandleFunc("/encrypt", func(w http.ResponseWriter, r *http.Request) {
+		encryptDataHandler(w, r, n)
+	})
+	// decrypt some data
+	http.HandleFunc("/decrypt", func(w http.ResponseWriter, r *http.Request) {
+		decryptDataHandler(w, r, n)
+	})
+	/*
+		READ OPERATIONS
+	*/
+	// generic blockchain query?
+	http.HandleFunc("/read", func(w http.ResponseWriter, r *http.Request) {
+		blockchainQueryHandler(w, r, n)
+	})
 
 	http.HandleFunc("/inbox", func(w http.ResponseWriter, r *http.Request) {
 		inboxHandler(w, r, n)
@@ -95,35 +125,13 @@ func (n *Node) Run(ctx context.Context) error {
 	http.HandleFunc("/info", func(w http.ResponseWriter, r *http.Request) {
 		infoHandler(w, r, n)
 	})
-	// send tokens to an address
-	http.HandleFunc("/send/tokens", func(w http.ResponseWriter, r *http.Request) {
-		sendTokensHandler(w, r, n)
-	})
-	// send CID to someone (costs 1 FTC)
-	http.HandleFunc("/send/cid", func(w http.ResponseWriter, r *http.Request) {
-		sendCIDHandler(w, r, n)
-	})
-	// add a PeerNode to the trusted peers slice
 	http.HandleFunc("/peers/known", func(w http.ResponseWriter, r *http.Request) {
 		knownPeersHandler(w, r, n)
 	})
-	// add a PeerNode to the trusted peers slice
 	http.HandleFunc("/peers/trusted", func(w http.ResponseWriter, r *http.Request) {
 		trustedPeersHandler(w, r, n)
 	})
-	// add a PeerNode to the trusted peers slice
-	http.HandleFunc("/peers/trusted/add", func(w http.ResponseWriter, r *http.Request) {
-		addTrustedPeerNodeHandler(w, r, n)
-	})
-	// for now, only allow string data, but change that in the future
-	http.HandleFunc("/encrypt", func(w http.ResponseWriter, r *http.Request) {
-		encryptDataHandler(w, r, n)
-	})
-	// decrypt some data
-	http.HandleFunc("/decrypt", func(w http.ResponseWriter, r *http.Request) {
-		decryptDataHandler(w, r, n)
-	})
-	// THE BELOW COULD BE RPC
+	// THE BELOW COULD BE RPC?
 	// get node status
 	http.HandleFunc("/node/status", func(w http.ResponseWriter, r *http.Request) {
 		nodeStatusHandler(w, r, n)
@@ -271,12 +279,10 @@ func (n *Node) AddPendingTX(tx manifest.SignedTx) error {
 		n.pendingTXs[txHash.Hex()] = tx
 		n.newPendingTXs <- tx
 		tmpFrom := n.state.Manifest[tx.From]
-		// if this is the first pending transaction
-		// TODO - checking if Sent is nil isn't a great thing.. should add a func to check if empty
-		// this is what "requestToken" should do....
 		if tmpFrom.Sent == nil {
 			tmpFrom.Inbox = make([]manifest.InboxItem, 0)
 			tmpFrom.Sent = make([]manifest.SentItem, 0)
+			// uncomment the below in order to automatically reward new addresses
 			// tmpFrom.Balance += manifest.BlockReward
 			// tmpFrom.PendingBalance += tmpFrom.Balance
 		}
@@ -289,10 +295,10 @@ func (n *Node) AddPendingTX(tx manifest.SignedTx) error {
 		// increase the account nonce => allows us to support mining blocks with multiple transactions
 		n.state.PendingAccount2Nonce[tx.From]++
 		tmpTo := n.state.Manifest[tx.To]
-		// if this is the first pending transaction, initialize data -> should this really happen this way? seems wrong...
 		if tmpTo.Inbox == nil {
 			tmpTo.Sent = make([]manifest.SentItem, 0)
 			tmpTo.Inbox = make([]manifest.InboxItem, 0)
+			// uncomment the below in order to automatically reward new addresses
 			// tmpTo.Balance += manifest.BlockReward
 			// tmpTo.PendingBalance += tmpTo.Balance
 		}

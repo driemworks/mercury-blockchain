@@ -43,6 +43,8 @@ type trustedPeersResponse struct {
 }
 
 // '/inbox?from={}&limit={}'
+/**
+ */
 func inboxHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	fromNode := r.URL.Query().Get("from")
 	limitString := r.URL.Query().Get("limit")
@@ -71,6 +73,8 @@ func inboxHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 }
 
 // '/sent?from={]&limit={}'
+/**
+ */
 func sentHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	fromNode := r.URL.Query().Get("from")
 	limitString := r.URL.Query().Get("limit")
@@ -99,12 +103,16 @@ func sentHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 }
 
 // '/info'
+/**
+ */
 func infoHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	from := node.info.Address
 	writeRes(w, listInfoResponse{from.Hex(), node.name,
 		node.state.Manifest[from].Balance})
 }
 
+/**
+ */
 func knownPeersHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	knownPeers := make([]peerResponse, 0, len(node.knownPeers))
 	for _, n := range node.knownPeers {
@@ -113,6 +121,8 @@ func knownPeersHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	writeRes(w, knownPeersResponse{knownPeers})
 }
 
+/**
+ */
 func trustedPeersHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	trustedPeers := make([]peerResponse, 0, len(node.trustedPeers))
 	for _, n := range node.trustedPeers {
@@ -121,10 +131,6 @@ func trustedPeersHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	writeRes(w, trustedPeersResponse{trustedPeers})
 }
 
-/**
-* TODO - can probably expand this to handle generic state mutation, then restrict the
- use of it based on endpoint parameters
-*/
 func sendCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	req := cidAddRequest{}
 	err := readReq(r, &req)
@@ -141,12 +147,10 @@ func sendCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	from := node.info.Address
 	to := manifest.NewAddress(req.To)
 	// validations to make sure the recipient is valid addresses
-	if to.String() == common.HexToAddress("").String() {
+	// if the 'to' parameter is empty, it will be assumed that anybody can access this data
+	// i.e. it is public data for any node in the network
+	if to.String() == common.HexToAddress("").String() && to.String() != "" {
 		writeErrRes(w, fmt.Errorf("%s is an invalid 'to' address", to.String()))
-		return
-	}
-	if req.FromPwd == "" {
-		writeErrRes(w, fmt.Errorf("password to decrypt the %s address is required. 'from_pwd' is empty", from))
 		return
 	}
 	// check that the pending balance is greater than zero
@@ -191,6 +195,7 @@ func addTrustedPeerNodeHandler(w http.ResponseWriter, r *http.Request, node *Nod
 		w.Write([]byte("{\"error_code\": \"ERR_001\", \"error_desc\": \"no known node with provided address\"}"))
 	}
 	node.trustedPeers[req.TcpAddress] = node.knownPeers[req.TcpAddress]
+	// TODO write trusted peers to a file.. perhaps as a transaction
 	writeRes(w, struct{ trustedPeers map[string]PeerNode }{
 		node.trustedPeers,
 	})

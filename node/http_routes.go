@@ -68,7 +68,7 @@ type cidAddRequest struct {
 }
 
 type encryptDataRequest struct {
-	Data    string `json:"data"` // doing this for now, change to multipart upload later
+	Data    string `json:"data"` // doing this for now, change to multipart upload later?
 	To      string `json:"to"`
 	FromPwd string `json:"from_pwd"`
 }

@@ -110,26 +110,26 @@ func (s *State) AddBlock(b Block) (*State, Hash, error) {
 	if err != nil {
 		return s, Hash{}, err
 	}
-	if s.hasGenesisBlock && b.Header.Number != latestBlock.Header.Number+1 {
+	if s.hasGenesisBlock && b.Header.Number < latestBlock.Header.Number+1 {
 		if s.latestBlock.Header.Number == b.Header.Number {
 			if s.latestBlockHash == hash {
 				return nil, Hash{}, nil
 			} else if s.latestBlock.Header.PoW < b.Header.PoW {
 				// orphan your latest block, wait until next sync cycle to get new blocks
 				// could change this, but this is the simplest way to do it
-				fmt.Println("Another node mined the same block as you, but the proof of work was greater.")
-				fmt.Println("Rolling back latest block and reclaiming mining reward")
-				fmt.Println(rainbow.Red("Sorry"))
-				err = s.orphanLatestBlock()
-				if err != nil {
-					return nil, Hash{}, err
-				}
-				// reset the node's state
-				pendingState, err := NewStateFromDisk(pendingState.datadir)
-				if err != nil {
-					return nil, Hash{}, err
-				}
-				s = pendingState
+				// fmt.Println("Another node mined the same block as you, but the proof of work was greater.")
+				// fmt.Println("Rolling back latest block and reclaiming mining reward")
+				// fmt.Println(rainbow.Red("Sorry"))
+				// err = s.orphanLatestBlock()
+				// if err != nil {
+				// 	return nil, Hash{}, err
+				// }
+				// // reset the node's state
+				// pendingState, err := NewStateFromDisk(pendingState.datadir)
+				// if err != nil {
+				// 	return nil, Hash{}, err
+				// }
+				// s = pendingState
 				return nil, Hash{}, nil
 				// return s, Hash{}, fmt.Errorf("ORPHAN BLOCK ENCOUNTERED")
 			} else {

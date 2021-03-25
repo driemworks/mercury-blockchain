@@ -1,11 +1,11 @@
 # FTP2P
-FTP2P is a p2p file transfer tool.
+FTP2P is a blockchain for sharing [CID's](https://docs.ipfs.io/concepts/content-addressing/) with peers. If you're familiar with pinning services (such as [this one](https://pinata.cloud/)), then you can best think of FTP2P as a inverted pinning service. FTP2P does not have any direct integration or dependency on IPFS. 
 
 ## Getting Started
 
 ### Pre requisites
-- FTP2P accomplishes decentralized file transfer by leveraging the `CID` of data stored in IPFS. 
-Though not technically used in this project, for more info on IPFS, see https://docs.ipfs.io/install/ipfs-desktop/ 
+- install `go`
+- install `ipfs` (recommended)
 
 ### Installation 
 - navigate to the root directory `ftp2p/` and run `go install ./cli/...` to install the go modules
@@ -41,23 +41,23 @@ Though not technically used in this project, for more info on IPFS, see https://
 See the [API documentation](https://github.com/driemworks/ftp2p/blob/master/docs/api/api.md)
 
 ### Node/Sync API
-`POST /node/sync`
-`POST /node/status`
-`POST /node/peer`
+#### Pending Documentation
+- `POST /node/sync`
+- `POST /node/status`
+- `POST /node/peer`
 
 
 ### Development
 TODO:
-- [ ] Build encryption/decryption functionality (need to integrate with go-ethereum first) and expose via API
-  - WIP: encryption/decryption is available in a limited way -> only for string data and you can only encrypt/decrypt for yourself
-- [ ] gRPC migration
-- [ ] research admin/moderation capabilities
-- [ ] consider separating miner/api
-- [ ] complete readme
-- [ ] Add tests
+- [] encryption/decryption
+- [] gRPC migration
+- [] research admin/moderation capabilities
+- [] consider separating miner/api
+- [] complete readme
+- [] Add tests
 
 ### Testing
 - example: $ go test ./node/ -test.v -test.run ^TestValidBlockHash$ 
 
 ## Acknowledgements
-- This repository is heavily influenced by this repo and the associated ebook https://github.com/web3coach/the-blockchain-bar
+- This repository's basis is heavily influenced by this repo and the associated ebook https://github.com/web3coach/the-blockchain-bar

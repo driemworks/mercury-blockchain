@@ -60,7 +60,8 @@ func runCmd() *cobra.Command {
 			}
 			publicKey := keys[:32]
 			n := node.NewNode(name, getDataDirFromCmd(cmd), ip, port,
-				manifest.NewAddress(miner), string(publicKey), bootstrap)
+				manifest.NewAddress(miner), string(publicKey),
+				bootstrap)
 			err = n.Run(context.Background())
 			if err != nil {
 				fmt.Println(err)

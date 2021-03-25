@@ -40,13 +40,14 @@ func TestNode_Mining(t *testing.T) {
 		"127.0.0.1",
 		8085,
 		false,
-		manifest.NewAddress(""),
+		manifest.NewAddress("0x9F0d31dFE801cc74ED9e50F06aDC7B168FF2F35b"),
+		"",
 		true,
 	)
 
 	// Construct a new Node instance and configure
 	// Andrej as a miner
-	n := NewNode("testAlias", datadir, nInfo.IP, nInfo.Port, manifest.NewAddress("test"), nInfo)
+	n := NewNode("testAlias", datadir, nInfo.IP, nInfo.Port, manifest.NewAddress("test"), "", nInfo)
 
 	// Allow the mining to run for 30 mins, in the worst case
 	ctx, closeNode := context.WithTimeout(

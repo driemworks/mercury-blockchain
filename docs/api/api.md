@@ -41,7 +41,7 @@
     <div style="border:solid 1px black;padding:10px;">
         <span style="font-weight:bold">URL</span>: <span style="">/inbox</span>
         <br>
-        <span style="font-weight:bold">Description</span>:  <span style="">The inbox endpoint allows the owner of the node to view transactions for which it is the recipient</span>
+        <span style="font-weight:bold">Description</span>:  <span style="">The inbox endpoint allows the owner of the node to view transactions for which it is the direct recipient</span>
         <br>
         <span style="font-weight:bold">Method</span>:  <span style="">GET</span>
         <div style="border:solid 1px black;">
@@ -188,11 +188,11 @@
 </details>
 
 <details>
-    <summary>Send CID</summary>
+    <summary>Publish Content</summary>
     <div style="border:solid 1px black;padding:10px;">
-        <span style="font-weight:bold">URL</span>: <span style="">/send/cid</span>
+        <span style="font-weight:bold">URL</span>: <span style="">/publish</span>
         <br>
-        <span style="font-weight:bold">Description</span>:  <span style="">The '/send/cid' endpoint allows a node to send a cid to another node</span>
+        <span style="font-weight:bold">Description</span>:  <span style="">The '/publish' endpoint allows a node to publish content so that it is visible to the network, with visibility determined by the 'to' request parameter.</span>
         <br>
         <span style="font-weight:bold">Method</span>:  <span style="">POST</span>
         <div style="border:solid 1px black;">
@@ -324,11 +324,11 @@
 </details>
 
 <details>
-    <summary>Add Trusted Peers</summary>
+    <summary>Follow</summary>
     <div style="border:solid 1px black;padding:10px;">
-        <span style="font-weight:bold">URL</span>: <span style="">/peers/trusted/add</span>
+        <span style="font-weight:bold">URL</span>: <span style="">/follow</span>
         <br>
-        <span style="font-weight:bold">Description</span>:  <span style="">Allows a node to append known peers to their trusted peers list. A trusted peer is info of a particular peer node that can be easily retrieved/accessed even if the peer is offline</span>
+        <span style="font-weight:bold">Description</span>:  <span style="">"Follow" another node. This a llows a node to append known peers to their trusted peers list. A trusted peer is info of a particular peer node that can be easily retrieved/accessed even if the peer is offline</span>
         <br>
         <span style="font-weight:bold">Method</span>:  <span style="">POST</span>
         <div style="border:solid 1px black;">

@@ -9,6 +9,7 @@ require (
 	github.com/raphamorim/go-rainbow v0.1.0
 	github.com/spf13/cobra v1.1.3
 	github.com/stretchr/testify v1.5.1
+	github.com/thedevsaddam/gojsonq/v2 v2.5.2 // indirect
 	github.com/tomnomnom/xtermcolor v0.0.0-20160428124646-b78803f00a7e // indirect
 	github.com/web3coach/the-blockchain-bar v0.0.0-20210125201636-fecdd0fe12a6
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
