@@ -1,4 +1,4 @@
-package manifest
+package state
 
 import (
 	"bytes"
@@ -12,8 +12,8 @@ import (
 
 type Hash [32]byte
 
-func (h Hash) MarshalText() ([]byte, error) {
-	return []byte(h.Hex()), nil
+func (h Hash) MarshalText() []byte {
+	return []byte(h.Hex())
 }
 
 func (h *Hash) UnmarshalText(data []byte) error {
@@ -64,7 +64,8 @@ func (b *Block) Hash() (Hash, error) {
 /*
 	NewBlock
 */
-func NewBlock(parent Hash, time uint64, number uint64, txs []SignedTx, nonce uint32, miner common.Address, pow int) Block {
+func NewBlock(parent Hash, time uint64, number uint64, txs []SignedTx,
+	nonce uint32, miner common.Address, pow int) Block {
 	return Block{BlockHeader{parent, time, number, nonce, miner, pow}, txs}
 }
 
@@ -72,9 +73,9 @@ func NewBlock(parent Hash, time uint64, number uint64, txs []SignedTx, nonce uin
 	IsBlockHashValid
 */
 func IsBlockHashValid(hash Hash) bool {
-	return fmt.Sprintf("%x", hash[0]) == "1" &&
+	return fmt.Sprintf("%x", hash[0]) == "0" &&
 		fmt.Sprintf("%x", hash[1]) == "0" &&
-		fmt.Sprintf("%x", hash[2]) == "1" &&
+		fmt.Sprintf("%x", hash[2]) == "0" &&
 		fmt.Sprintf("%x", hash[3]) != "0"
 
 }

@@ -2,7 +2,7 @@ package node
 
 import (
 	"context"
-	"ftp2p/manifest"
+	"ftp2p/state"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,12 +11,12 @@ import (
 
 func TestNode_Run(t *testing.T) {
 	datadir := getTestDataDirPath()
-	err := manifest.RemoveDir(datadir)
+	err := state.RemoveDir(datadir)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	n := NewNode("testAlias", datadir, "127.0.0.1", 8085, manifest.NewAddress("test"), PeerNode{})
+	n := NewNode("testAlias", datadir, "127.0.0.1", 8085, state.NewAddress("test"), PeerNode{})
 
 	ctx, _ := context.WithTimeout(context.Background(), time.Second*5)
 	err = n.Run(ctx)
@@ -28,7 +28,7 @@ func TestNode_Run(t *testing.T) {
 func TestNode_Mining(t *testing.T) {
 	// Remove the test directory if it already exists
 	datadir := getTestDataDirPath()
-	err := manifest.RemoveDir(datadir)
+	err := state.RemoveDir(datadir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,14 +40,14 @@ func TestNode_Mining(t *testing.T) {
 		"127.0.0.1",
 		8085,
 		false,
-		manifest.NewAddress("0x9F0d31dFE801cc74ED9e50F06aDC7B168FF2F35b"),
+		state.NewAddress("0x9F0d31dFE801cc74ED9e50F06aDC7B168FF2F35b"),
 		"",
 		true,
 	)
 
 	// Construct a new Node instance and configure
 	// Andrej as a miner
-	n := NewNode("testAlias", datadir, nInfo.IP, nInfo.Port, manifest.NewAddress("test"), "", nInfo)
+	n := NewNode("testAlias", datadir, nInfo.IP, nInfo.Port, state.NewAddress("test"), "", nInfo)
 
 	// Allow the mining to run for 30 mins, in the worst case
 	ctx, closeNode := context.WithTimeout(

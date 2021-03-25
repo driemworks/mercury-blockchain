@@ -1,4 +1,4 @@
-package manifest
+package state
 
 import (
 	"encoding/json"

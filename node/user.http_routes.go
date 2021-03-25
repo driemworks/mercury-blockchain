@@ -2,7 +2,7 @@ package node
 
 import (
 	"fmt"
-	"ftp2p/manifest"
+	"ftp2p/state"
 	"ftp2p/wallet"
 	"math"
 	"net/http"
@@ -13,11 +13,11 @@ import (
 )
 
 type listInboxResponse struct {
-	Inbox []manifest.InboxItem `json:"inbox"`
+	Inbox []state.InboxItem `json:"inbox"`
 }
 
 type listSentResponse struct {
-	Sent []manifest.SentItem `json:"sent"`
+	Sent []state.SentItem `json:"sent"`
 }
 
 type listInfoResponse struct {
@@ -55,7 +55,7 @@ func inboxHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	thisNode := node.info.Address
 
 	inbox := node.state.Manifest[thisNode].Inbox
-	inboxItems := make([]manifest.InboxItem, 0)
+	inboxItems := make([]state.InboxItem, 0)
 	if fromNode != "" {
 		for _, item := range inbox {
 			if item.From.Hex() == fromNode {
@@ -85,7 +85,7 @@ func sentHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	thisNode := node.info.Address
 
 	sent := node.state.Manifest[thisNode].Sent
-	sentItems := make([]manifest.SentItem, 0)
+	sentItems := make([]state.SentItem, 0)
 	if fromNode != "" {
 		for _, item := range sent {
 			if item.To.Hex() == fromNode {
@@ -145,7 +145,7 @@ func sendCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	}
 	// safe to assume 'from' is a valid address
 	from := node.info.Address
-	to := manifest.NewAddress(req.To)
+	to := state.NewAddress(req.To)
 	// validations to make sure the recipient is valid addresses
 	// if the 'to' parameter is empty, it will be assumed that anybody can access this data
 	// i.e. it is public data for any node in the network
@@ -153,11 +153,12 @@ func sendCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		writeErrRes(w, fmt.Errorf("%s is an invalid 'to' address", to.String()))
 		return
 	}
+	// TODO tx cost no FTC for now
 	// check that the pending balance is greater than zero
-	if node.state.Manifest[from].Balance <= float32(0) {
-		writeErrRes(w, fmt.Errorf("your pending balance is non-positive. Please add funds and try again"))
-		return
-	}
+	// if node.state.Manifest[from].Balance <= float32(0) {
+	// 	writeErrRes(w, fmt.Errorf("your pending balance is non-positive. Please add funds and try again"))
+	// 	return
+	// }
 	// verify  the tx contains a valid CID
 	_, err = goCid.Decode(fmt.Sprintf("%s", req.Cid))
 	if err != nil {
@@ -167,7 +168,7 @@ func sendCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	nonce := node.state.PendingAccount2Nonce[node.info.Address] + 1
 	// TODO - the cost to send a cid is always 1?
 	// should this really go to the tx's to value, or to the 'system' (bootstrap) node?
-	tx := manifest.NewTx(from, manifest.NewAddress(req.To), manifest.NewCID(req.Cid, req.Gateway), nonce, 1)
+	tx := state.NewTx(from, state.NewAddress(req.To), state.NewCID(req.Cid, req.Gateway), nonce, 0)
 	signedTx, err := wallet.SignTxWithKeystoreAccount(
 		tx, node.info.Address, req.FromPwd, wallet.GetKeystoreDirPath(node.datadir))
 	if err != nil {
@@ -189,7 +190,7 @@ func addTrustedPeerNodeHandler(w http.ResponseWriter, r *http.Request, node *Nod
 		writeErrRes(w, err)
 		return
 	}
-	if node.knownPeers[req.TcpAddress].Address == manifest.NewAddress("0x0000000000000000000000000000000000000000") {
+	if node.knownPeers[req.TcpAddress].Address == state.NewAddress("0x0000000000000000000000000000000000000000") {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("{\"error_code\": \"ERR_001\", \"error_desc\": \"no known node with provided address\"}"))
@@ -218,7 +219,7 @@ func sendTokensHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	}
 	from := node.info.Address
 	nonce := node.state.PendingAccount2Nonce[node.info.Address] + 1
-	tx := manifest.NewTx(from, manifest.NewAddress(req.To), manifest.NewCID("", ""), nonce, float32(req.Amount))
+	tx := state.NewTx(from, state.NewAddress(req.To), state.NewCID("", ""), nonce, float32(req.Amount))
 	signedTx, err := wallet.SignTxWithKeystoreAccount(tx, from, req.FromPwd,
 		wallet.GetKeystoreDirPath(node.datadir))
 	if err != nil {

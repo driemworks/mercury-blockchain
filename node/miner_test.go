@@ -3,7 +3,7 @@ package node
 import (
 	"context"
 	"encoding/hex"
-	"ftp2p/manifest"
+	"ftp2p/state"
 	"testing"
 	"time"
 
@@ -12,9 +12,9 @@ import (
 
 func TestValidBlockHash(t *testing.T) {
 	hexHash := "000000a293498234821349823482349823dffa"
-	var hash = manifest.Hash{}
+	var hash = state.Hash{}
 	hex.Decode(hash[:], []byte(hexHash))
-	isValid := manifest.IsBlockHashValid(hash)
+	isValid := state.IsBlockHashValid(hash)
 	if !isValid {
 		t.Fatalf("hash '%s' with 6 zeroes should be valid", hexHash)
 	}
@@ -22,16 +22,16 @@ func TestValidBlockHash(t *testing.T) {
 
 func TestInvalidBlockHash(t *testing.T) {
 	hexHash := "999999999"
-	var hash = manifest.Hash{}
+	var hash = state.Hash{}
 	hex.Decode(hash[:], []byte(hexHash))
-	isValid := manifest.IsBlockHashValid(hash)
+	isValid := state.IsBlockHashValid(hash)
 	if !isValid {
 		t.Fatalf("hash '%s' should not be valid", hexHash)
 	}
 }
 
 func TestMine(t *testing.T) {
-	miner := manifest.NewAddress("tony")
+	miner := state.NewAddress("tony")
 	pendingBlock := createRandomPendingBlock(miner)
 	ctx := context.Background()
 	minedBlock, err := Mine(ctx, pendingBlock)
@@ -42,7 +42,7 @@ func TestMine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !manifest.IsBlockHashValid(mineBlockHash) {
+	if !state.IsBlockHashValid(mineBlockHash) {
 		t.Fatal()
 	}
 	if minedBlock.Header.Miner != miner {
@@ -51,7 +51,7 @@ func TestMine(t *testing.T) {
 }
 
 func TestMineWithTimeout(t *testing.T) {
-	miner := manifest.NewAddress("andrej")
+	miner := state.NewAddress("andrej")
 	pendingBlock := createRandomPendingBlock(miner)
 
 	ctx, _ := context.WithTimeout(context.Background(), time.Microsecond*100)
@@ -63,8 +63,8 @@ func TestMineWithTimeout(t *testing.T) {
 }
 
 func createRandomPendingBlock(miner common.Address) PendingBlock {
-	return NewPendingBlock(manifest.Hash{}, 0, miner, []manifest.SignedTx{
-		{manifest.Tx{From: manifest.NewAddress("tony"), To: manifest.NewAddress("theo"), CID: manifest.NewCID("", "")}, []byte{}},
+	return NewPendingBlock(state.Hash{}, 0, miner, []state.SignedTx{
+		{state.Tx{From: state.NewAddress("tony"), To: state.NewAddress("theo"), CID: state.NewCID("", "")}, []byte{}},
 	},
 	)
 }

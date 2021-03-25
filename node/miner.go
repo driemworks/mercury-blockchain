@@ -3,7 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
-	"ftp2p/manifest"
+	"ftp2p/state"
 	"math/rand"
 	"time"
 
@@ -16,14 +16,14 @@ const DefaultMiner = "0xasdf"
 
 // PendingBlock represents a block before it has been mined
 type PendingBlock struct {
-	parent manifest.Hash
+	parent state.Hash
 	number uint64
 	time   uint64
 	miner  common.Address
-	txs    []manifest.SignedTx
+	txs    []state.SignedTx
 }
 
-func NewPendingBlock(parent manifest.Hash, number uint64, miner common.Address, txs []manifest.SignedTx) PendingBlock {
+func NewPendingBlock(parent state.Hash, number uint64, miner common.Address, txs []state.SignedTx) PendingBlock {
 	return PendingBlock{parent, number, uint64(time.Now().Unix()), miner, txs}
 }
 
@@ -32,23 +32,23 @@ func generateNonce() uint32 {
 	return rand.Uint32()
 }
 
-func Mine(ctx context.Context, pb PendingBlock) (manifest.Block, error) {
+func Mine(ctx context.Context, pb PendingBlock) (state.Block, error) {
 	if len(pb.txs) == 0 {
-		return manifest.Block{}, fmt.Errorf(rainbow.Red("block is empty - there is nothing to mine"))
+		return state.Block{}, fmt.Errorf(rainbow.Red("block is empty - there is nothing to mine"))
 	}
 
 	start := time.Now()
 	attempt := 0
-	var block manifest.Block
-	var hash manifest.Hash
+	var block state.Block
+	var hash state.Hash
 	var nonce uint32
 
-	for !manifest.IsBlockHashValid(hash) {
+	for !state.IsBlockHashValid(hash) {
 		select {
 		case <-ctx.Done():
 			fmt.Println("Mining cancelled!")
 
-			return manifest.Block{}, fmt.Errorf(rainbow.Red("mining cancelled. %s"), ctx.Err())
+			return state.Block{}, fmt.Errorf(rainbow.Red("mining cancelled. %s"), ctx.Err())
 		default:
 		}
 
@@ -59,10 +59,10 @@ func Mine(ctx context.Context, pb PendingBlock) (manifest.Block, error) {
 			fmt.Printf("Mining "+rainbow.Magenta("%d")+" Pending TXs. Attempt: "+rainbow.Magenta("%d")+".\n", len(pb.txs), attempt)
 		}
 
-		block = manifest.NewBlock(pb.parent, pb.time, pb.number, pb.txs, nonce, pb.miner, attempt)
+		block = state.NewBlock(pb.parent, pb.time, pb.number, pb.txs, nonce, pb.miner, attempt)
 		blockHash, err := block.Hash()
 		if err != nil {
-			return manifest.Block{}, fmt.Errorf("couldn't mine block. %s", err.Error())
+			return state.Block{}, fmt.Errorf("couldn't mine block. %s", err.Error())
 		}
 
 		hash = blockHash

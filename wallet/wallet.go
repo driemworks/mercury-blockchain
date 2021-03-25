@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"ftp2p/manifest"
+	"ftp2p/state"
 	"io"
 	"io/ioutil"
 	"os"
@@ -25,28 +25,6 @@ import (
 
 const keystoreDirName = "keystore"
 const X25519 = "x25519-xsalsa20-poly1305"
-const (
-	keyHeaderKDF = "scrypt"
-
-	// StandardScryptN is the N parameter of Scrypt encryption algorithm, using 256MB
-	// memory and taking approximately 1s CPU time on a modern processor.
-	StandardScryptN = 1 << 18
-
-	// StandardScryptP is the P parameter of Scrypt encryption algorithm, using 256MB
-	// memory and taking approximately 1s CPU time on a modern processor.
-	StandardScryptP = 1
-
-	// LightScryptN is the N parameter of Scrypt encryption algorithm, using 4MB
-	// memory and taking approximately 100ms CPU time on a modern processor.
-	LightScryptN = 1 << 12
-
-	// LightScryptP is the P parameter of Scrypt encryption algorithm, using 4MB
-	// memory and taking approximately 100ms CPU time on a modern processor.
-	LightScryptP = 6
-
-	scryptR     = 8
-	scryptDKLen = 32
-)
 
 // EncryptedData is encrypted blob
 type EncryptedData struct {
@@ -91,13 +69,13 @@ func generateEncryptionKeys(datadir string, privateKey []byte) error {
 	if err != nil {
 		return err
 	}
-	manifest.WriteEncryptionKeys(datadir, encryptedEncryptionKeys)
+	state.WriteEncryptionKeys(datadir, encryptedEncryptionKeys)
 	return nil
 }
 
 func LoadEncryptionKeys(datadir string, password string) ([]byte, error) {
 	// load keys.json file
-	encryptionKeysJsonFile, err := os.OpenFile(manifest.GetEncryptionKeysFilePath(datadir), os.O_RDONLY, 0600)
+	encryptionKeysJsonFile, err := os.OpenFile(state.GetEncryptionKeysFilePath(datadir), os.O_RDONLY, 0600)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -175,19 +153,19 @@ func Decrypt(receiverPrivateKey [32]byte, encryptedData *EncryptedData) ([]byte,
 	}
 }
 
-func SignTxWithKeystoreAccount(tx manifest.Tx, address common.Address, pwd, keystoreDir string) (manifest.SignedTx, error) {
+func SignTxWithKeystoreAccount(tx state.Tx, address common.Address, pwd, keystoreDir string) (state.SignedTx, error) {
 	keystoreJSON, err := recoverKeystoreJSON(keystoreDir, address)
 	if err != nil {
-		return manifest.SignedTx{}, err
+		return state.SignedTx{}, err
 	}
 	key, err := keystore.DecryptKey(keystoreJSON, pwd)
 	if err != nil {
-		return manifest.SignedTx{}, err
+		return state.SignedTx{}, err
 	}
 
 	signedTx, err := SignTx(tx, key.PrivateKey)
 	if err != nil {
-		return manifest.SignedTx{}, err
+		return state.SignedTx{}, err
 	}
 
 	return signedTx, nil
@@ -207,18 +185,18 @@ func recoverKeystoreJSON(keystoreDir string, address common.Address) ([]byte, er
 	return ksAccountJSON, nil
 }
 
-func SignTx(tx manifest.Tx, privKey *ecdsa.PrivateKey) (manifest.SignedTx, error) {
+func SignTx(tx state.Tx, privKey *ecdsa.PrivateKey) (state.SignedTx, error) {
 	rawTx, err := tx.Encode()
 	if err != nil {
-		return manifest.SignedTx{}, err
+		return state.SignedTx{}, err
 	}
 
 	sig, err := Sign(rawTx, privKey)
 	if err != nil {
-		return manifest.SignedTx{}, err
+		return state.SignedTx{}, err
 	}
 
-	return manifest.NewSignedTx(tx, sig), nil
+	return state.NewSignedTx(tx, sig), nil
 }
 
 func Sign(msg []byte, privKey *ecdsa.PrivateKey) (sig []byte, err error) {

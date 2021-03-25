@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"ftp2p/manifest"
+	"ftp2p/state"
 	"os"
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
@@ -44,7 +44,7 @@ func addKeystoreFlag(cmd *cobra.Command) {
 
 func getDataDirFromCmd(cmd *cobra.Command) string {
 	dataDir, _ := cmd.Flags().GetString(flagDataDir)
-	return manifest.ExpandPath(dataDir)
+	return state.ExpandPath(dataDir)
 }
 
 func addDefaultRequiredFlags(cmd *cobra.Command) {

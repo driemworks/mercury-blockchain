@@ -1,4 +1,4 @@
-package manifest
+package state
 
 import (
 	"bufio"
@@ -54,8 +54,8 @@ type State struct {
 }
 
 /*
-* Loads the current state by replaying all transactions in tx.db
-* on top of the gensis state as defined in genesis.json
+* Loads the current state by replaying all transactions in block.db
+* on top of the genesis state as defined in genesis.json
  */
 func NewStateFromDisk(datadir string) (*State, error) {
 	err := initDataDirIfNotExists(datadir)

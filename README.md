@@ -48,13 +48,7 @@ See the [API documentation](https://github.com/driemworks/ftp2p/blob/master/docs
 
 
 ### Development
-TODO:
-- [] encryption/decryption
-- [] gRPC migration
-- [] research admin/moderation capabilities
-- [] consider separating miner/api
-- [] complete readme
-- [] Add tests
+TODO 
 
 ### Testing
 - example: $ go test ./node/ -test.v -test.run ^TestValidBlockHash$ 

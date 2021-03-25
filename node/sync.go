@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"ftp2p/manifest"
+	"ftp2p/state"
 	"net/http"
 	"time"
 
@@ -141,7 +141,7 @@ func (n *Node) syncKnownPeers(status StatusResponse) error {
 	return nil
 }
 
-func (n *Node) syncPendingTXs(txs []manifest.SignedTx) error {
+func (n *Node) syncPendingTXs(txs []state.SignedTx) error {
 	for _, tx := range txs {
 		err := n.AddPendingTX(tx)
 		if err != nil {
@@ -210,7 +210,7 @@ func queryPeerStatus(peer PeerNode) (StatusResponse, error) {
 	return StatusResponse, nil
 }
 
-func fetchBlocksFromPeer(peer PeerNode, fromBlock manifest.Hash) ([]manifest.Block, error) {
+func fetchBlocksFromPeer(peer PeerNode, fromBlock state.Hash) ([]state.Block, error) {
 	fmt.Printf("Importing blocks from Peer %s...\n", rainbow.Bold(rainbow.Green(peer.TcpAddress())))
 
 	url := fmt.Sprintf(

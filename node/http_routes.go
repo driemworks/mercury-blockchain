@@ -2,7 +2,7 @@ package node
 
 import (
 	"fmt"
-	"ftp2p/manifest"
+	"ftp2p/state"
 	"ftp2p/wallet"
 	"net/http"
 	"strconv"
@@ -13,7 +13,7 @@ import (
 
 // SyncRes is the response struct for representing new blocks to sync
 type SyncRes struct {
-	Blocks []manifest.Block `json:"blocks"`
+	Blocks []state.Block `json:"blocks"`
 }
 
 // AddPeerRes is the response struct to represent if new peer addition
@@ -29,12 +29,12 @@ type ErrorResponse struct {
 
 // StatusResponse TODO
 type StatusResponse struct {
-	Hash         manifest.Hash       `json:"block_hash"`
+	Hash         state.Hash          `json:"block_hash"`
 	Number       uint64              `json:"block_number"`
 	Alias        string              `json:"alias"`
 	KnownPeers   map[string]PeerNode `json:"known_peers"`
 	TrustedPeers map[string]PeerNode `json:"trusted_peers"`
-	PendingTxs   []manifest.SignedTx `json:"pending_txs"`
+	PendingTxs   []state.SignedTx    `json:"pending_txs"`
 }
 
 type TokenRequestResponse struct {
@@ -49,15 +49,15 @@ type sendTokensRequest struct {
 }
 
 type manifestResponse struct {
-	Hash     manifest.Hash                        `json:"hash"`
-	Manifest map[common.Address]manifest.Manifest `json:"manifest"`
+	Hash     state.Hash                        `json:"hash"`
+	Manifest map[common.Address]state.Manifest `json:"manifest"`
 }
 
 type userMailboxResponse struct {
-	Hash    manifest.Hash     `json:"hash"`
-	Address common.Address    `json:"address"`
-	Name    string            `json:"name"`
-	Mailbox manifest.Manifest `json:"mailbox"`
+	Hash    state.Hash     `json:"hash"`
+	Address common.Address `json:"address"`
+	Name    string         `json:"name"`
+	Mailbox state.Manifest `json:"mailbox"`
 }
 
 type cidAddRequest struct {
@@ -111,14 +111,14 @@ func nodeStatusHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 func syncHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	reqHash := r.URL.Query().Get("fromBlock")
 
-	hash := manifest.Hash{}
+	hash := state.Hash{}
 	err := hash.UnmarshalText([]byte(reqHash))
 	if err != nil {
 		writeErrRes(w, err)
 		return
 	}
 
-	blocks, err := manifest.GetBlocksAfter(hash, node.datadir)
+	blocks, err := state.GetBlocksAfter(hash, node.datadir)
 	if err != nil {
 		writeErrRes(w, err)
 		return
@@ -142,7 +142,7 @@ func addPeerHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		writeRes(w, AddPeerRes{false, err.Error()})
 		return
 	}
-	peer := NewPeerNode(peerName, peerIP, peerPort, false, manifest.NewAddress(minerRaw), encryptionPublicKey, true)
+	peer := NewPeerNode(peerName, peerIP, peerPort, false, state.NewAddress(minerRaw), encryptionPublicKey, true)
 	node.AddPeer(peer)
 	fmt.Printf("Peer "+rainbow.Green("'%s'")+" was added into KnownPeers\n", peer.TcpAddress())
 	writeRes(w, AddPeerRes{true, ""})

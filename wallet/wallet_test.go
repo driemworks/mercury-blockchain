@@ -5,7 +5,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
-	"ftp2p/manifest"
+	"ftp2p/state"
 	"io/ioutil"
 	"math/big"
 	"testing"
@@ -13,8 +13,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/crypto/nacl/box"
 )
 
 // The password for testing keystore files:
@@ -146,7 +144,7 @@ func TestSignForgedTxWithKeystoreAccount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer manifest.RemoveDir(tmpDir)
+	defer state.RemoveDir(tmpDir)
 
 	hacker, err := NewKeystoreAccount(tmpDir, testKeystoreAccountsPwd)
 	if err != nil {
@@ -160,7 +158,7 @@ func TestSignForgedTxWithKeystoreAccount(t *testing.T) {
 		return
 	}
 
-	forgedTx := manifest.NewTx(babaYaga, hacker, manifest.NewCID("", ""), 1, 1)
+	forgedTx := state.NewTx(babaYaga, hacker, state.NewCID("", ""), 1, 1)
 
 	signedTx, err := SignTxWithKeystoreAccount(forgedTx, hacker, testKeystoreAccountsPwd, GetKeystoreDirPath(tmpDir))
 	if err != nil {
@@ -179,25 +177,25 @@ func TestSignForgedTxWithKeystoreAccount(t *testing.T) {
 	}
 }
 
-func Test_Encrypt_Decrypt_Multi_Node(t *testing.T) {
-	message := "Hi this is a message"
-	AlicePublicKey, AlicePrivateKey, _ := box.GenerateKey(rand.Reader)
-	BobPublicKey, BobPrivateKey, _ := box.GenerateKey(rand.Reader)
-	// alice -(msg)-> bob
-	encrypted, err := Encrypt(
-		*AlicePublicKey,
-		*AlicePrivateKey,
-		*BobPublicKey,
-		[]byte(message),
-		"x25519-xsalsa20-poly1305",
-	)
-	assert.Nil(t, err)
-	assert.NotNil(t, encrypted)
-	decrypted, err := Decrypt(
-		*BobPrivateKey, encrypted,
-	)
-	assert.Nil(t, err)
-	assert.NotNil(t, decrypted)
-	assert.Equal(t, message, string(decrypted))
+// func Test_Encrypt_Decrypt_Multi_Node(t *testing.T) {
+// 	message := "Hi this is a message"
+// 	AlicePublicKey, AlicePrivateKey, _ := box.GenerateKey(rand.Reader)
+// 	BobPublicKey, BobPrivateKey, _ := box.GenerateKey(rand.Reader)
+// 	// alice -(msg)-> bob
+// 	encrypted, err := Encrypt(
+// 		*AlicePublicKey,
+// 		*AlicePrivateKey,
+// 		*BobPublicKey,
+// 		[]byte(message),
+// 		"x25519-xsalsa20-poly1305",
+// 	)
+// 	assert.Nil(t, err)
+// 	assert.NotNil(t, encrypted)
+// 	decrypted, err := Decrypt(
+// 		*BobPrivateKey, encrypted,
+// 	)
+// 	assert.Nil(t, err)
+// 	assert.NotNil(t, decrypted)
+// 	assert.Equal(t, message, string(decrypted))
 
-}
+// }

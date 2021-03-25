@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"ftp2p/logging"
-	"ftp2p/manifest"
+	"ftp2p/state"
 	"net/http"
 	"time"
 
@@ -34,14 +34,14 @@ type Node struct {
 	datadir         string
 	ip              string
 	port            uint64
-	state           *manifest.State
+	state           *state.State
 	info            PeerNode
 	knownPeers      map[string]PeerNode
 	trustedPeers    map[string]PeerNode
-	pendingTXs      map[string]manifest.SignedTx
-	archivedTXs     map[string]manifest.SignedTx
-	newSyncedBlocks chan manifest.Block
-	newPendingTXs   chan manifest.SignedTx
+	pendingTXs      map[string]state.SignedTx
+	archivedTXs     map[string]state.SignedTx
+	newSyncedBlocks chan state.Block
+	newPendingTXs   chan state.SignedTx
 	isMining        bool
 	name            string
 }
@@ -59,10 +59,10 @@ func NewNode(name string, datadir string, ip string, port uint64,
 		knownPeers:      knownPeers,
 		trustedPeers:    make(map[string]PeerNode),
 		info:            NewPeerNode(name, ip, port, false, address, encryptionPublicKey, true),
-		pendingTXs:      make(map[string]manifest.SignedTx),
-		archivedTXs:     make(map[string]manifest.SignedTx),
-		newSyncedBlocks: make(chan manifest.Block),
-		newPendingTXs:   make(chan manifest.SignedTx, 10000),
+		pendingTXs:      make(map[string]state.SignedTx),
+		archivedTXs:     make(map[string]state.SignedTx),
+		newSyncedBlocks: make(chan state.Block),
+		newPendingTXs:   make(chan state.SignedTx, 10000),
 		isMining:        false,
 	}
 }
@@ -75,10 +75,8 @@ func NewPeerNode(name string, ip string, port uint64, isBootstrap bool, address 
 * Start the node's HTTP client
  */
 func (n *Node) Run(ctx context.Context) error {
-	// s := spinner.New(spinner.CharSets[9], 10*time.Millisecond)
-	// s.Start()
 	fmt.Println(fmt.Sprintf("Listening on: %s:%d", n.info.IP, n.info.Port))
-	state, err := manifest.NewStateFromDisk(n.datadir)
+	state, err := state.NewStateFromDisk(n.datadir)
 	// trusted peers will need to be tracked as transactions, so that we can recover/rebuild when starting node?
 	if err != nil {
 		return err
@@ -94,20 +92,20 @@ func (n *Node) Run(ctx context.Context) error {
 		sendCIDHandler(w, r, n)
 	})
 	// add a PeerNode to the trusted peers slice
-	http.HandleFunc("/peers/trusted/add", func(w http.ResponseWriter, r *http.Request) {
-		addTrustedPeerNodeHandler(w, r, n)
-	})
+	// http.HandleFunc("/peers/trusted/add", func(w http.ResponseWriter, r *http.Request) {
+	// 	addTrustedPeerNodeHandler(w, r, n)
+	// })
 	/*
 		ENCRYPTION OPERATIONS
 	*/
 	// for now, only allow string data, but change that in the future
-	http.HandleFunc("/encrypt", func(w http.ResponseWriter, r *http.Request) {
-		encryptDataHandler(w, r, n)
-	})
-	// decrypt some data
-	http.HandleFunc("/decrypt", func(w http.ResponseWriter, r *http.Request) {
-		decryptDataHandler(w, r, n)
-	})
+	// http.HandleFunc("/encrypt", func(w http.ResponseWriter, r *http.Request) {
+	// 	encryptDataHandler(w, r, n)
+	// })
+	// // decrypt some data
+	// http.HandleFunc("/decrypt", func(w http.ResponseWriter, r *http.Request) {
+	// 	decryptDataHandler(w, r, n)
+	// })
 	/*
 		READ OPERATIONS
 	*/
@@ -219,7 +217,7 @@ func (n *Node) minePendingTXs(ctx context.Context) error {
 	return nil
 }
 
-func (n *Node) removeMinedPendingTXs(block manifest.Block) {
+func (n *Node) removeMinedPendingTXs(block state.Block) {
 	if len(block.TXs) > 0 && len(n.pendingTXs) > 0 {
 		fmt.Println("Updating in-memory Pending TXs Pool:")
 	}
@@ -255,7 +253,7 @@ func (n *Node) IsKnownPeer(peer PeerNode) bool {
 /**
 *
  */
-func (n *Node) AddPendingTX(tx manifest.SignedTx) error {
+func (n *Node) AddPendingTX(tx state.SignedTx) error {
 	txHash, err := tx.Hash()
 	if err != nil {
 		return err
@@ -280,8 +278,8 @@ func (n *Node) AddPendingTX(tx manifest.SignedTx) error {
 		n.newPendingTXs <- tx
 		tmpFrom := n.state.Manifest[tx.From]
 		if tmpFrom.Sent == nil {
-			tmpFrom.Inbox = make([]manifest.InboxItem, 0)
-			tmpFrom.Sent = make([]manifest.SentItem, 0)
+			tmpFrom.Inbox = make([]state.InboxItem, 0)
+			tmpFrom.Sent = make([]state.SentItem, 0)
 			// uncomment the below in order to automatically reward new addresses
 			// tmpFrom.Balance += manifest.BlockReward
 			// tmpFrom.PendingBalance += tmpFrom.Balance
@@ -296,8 +294,8 @@ func (n *Node) AddPendingTX(tx manifest.SignedTx) error {
 		n.state.PendingAccount2Nonce[tx.From]++
 		tmpTo := n.state.Manifest[tx.To]
 		if tmpTo.Inbox == nil {
-			tmpTo.Sent = make([]manifest.SentItem, 0)
-			tmpTo.Inbox = make([]manifest.InboxItem, 0)
+			tmpTo.Sent = make([]state.SentItem, 0)
+			tmpTo.Inbox = make([]state.InboxItem, 0)
 			// uncomment the below in order to automatically reward new addresses
 			// tmpTo.Balance += manifest.BlockReward
 			// tmpTo.PendingBalance += tmpTo.Balance
@@ -308,8 +306,8 @@ func (n *Node) AddPendingTX(tx manifest.SignedTx) error {
 	return nil
 }
 
-func (n *Node) getPendingTXsAsArray() []manifest.SignedTx {
-	txs := make([]manifest.SignedTx, len(n.pendingTXs))
+func (n *Node) getPendingTXsAsArray() []state.SignedTx {
+	txs := make([]state.SignedTx, len(n.pendingTXs))
 	i := 0
 	for _, tx := range n.pendingTXs {
 		txs[i] = tx

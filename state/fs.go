@@ -1,7 +1,8 @@
-package manifest
+package state
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -127,7 +128,7 @@ func homeDir() string {
 func Unicode(s string) string {
 	r, _ := strconv.ParseInt(strings.TrimPrefix(s, "\\U"), 16, 32)
 
-	return string(r)
+	return fmt.Sprint(r)
 }
 
 func Rename(originalPath string, destinationPath string) error {
