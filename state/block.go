@@ -12,8 +12,8 @@ import (
 
 type Hash [32]byte
 
-func (h Hash) MarshalText() []byte {
-	return []byte(h.Hex())
+func (h Hash) MarshalText() ([]byte, error) {
+	return []byte(h.Hex()), nil
 }
 
 func (h *Hash) UnmarshalText(data []byte) error {
