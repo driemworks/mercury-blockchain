@@ -6,8 +6,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Major = "0"
-const Minor = "4"
+const Major = "1"
+const Minor = "0"
 const Patch = "0"
 
 var versionCmd = &cobra.Command{
