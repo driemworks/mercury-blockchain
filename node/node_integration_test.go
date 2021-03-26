@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 func TestNode_Run(t *testing.T) {
@@ -16,7 +18,9 @@ func TestNode_Run(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	n := NewNode("testAlias", datadir, "127.0.0.1", 8085, state.NewAddress("test"), PeerNode{})
+	n := NewNode("testAlias", datadir, "127.0.0.1", 8085, state.NewAddress("test"), "", NewPeerNode(
+		"", "127.0.0.1", 8080, false, common.Address{}, "", true,
+	))
 
 	ctx, _ := context.WithTimeout(context.Background(), time.Second*5)
 	err = n.Run(ctx)

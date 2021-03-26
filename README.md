@@ -43,7 +43,8 @@ go get github.com/driemworks/ftp2p/cli/...
   # generate a new address
   ftp2p wallet new-address --datadir=./.ftp2p
   >  0x27084384033F90d96c3769e1b4fCE0E5ffff720B
-  ftp2p run --datadir=./.ftp2p --name=Tony --miner=0x27084384033F90d96c3769e1b4fCE0E5ffff720B --port=8080
+  # start a node using the new address as the miner
+  ftp2p run --datadir=./.ftp2p --name=Theo --miner=0x27084384033F90d96c3769e1b4fCE0E5ffff720B --port=8080 --bootstrap-ip=127.0.0.1 --bootstrap-port=8081
   ```
 
 ## API
