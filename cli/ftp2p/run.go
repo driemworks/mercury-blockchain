@@ -44,11 +44,11 @@ func runCmd() *cobra.Command {
 			fmt.Printf("\t\t Using bootstrap node: %s:%s\n", rainbow.Green(bootstrapIP), rainbow.Green(fmt.Sprint(bootstrapPort)))
 			fmt.Println("")
 			bootstrap := node.NewPeerNode(
-				"tony",
+				"bootstrap",
 				bootstrapIP,
 				bootstrapPort,
 				true,
-				state.NewAddress("0xE924010A83925452C3B79240FC38e825a0B509bA"), // should be able to get this on sync? otherwise ip <-> address is neeeded...
+				state.NewAddress(""), // 0x96131b31b9935f6388502b502cf544c1a8c65ad6
 				"",
 				false,
 			)
