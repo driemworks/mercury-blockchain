@@ -9,7 +9,7 @@ import (
 
 func Test_MarshallText(t *testing.T) {
 	hash := buildValidHash()
-	marshalledText := hash.MarshalText()
+	marshalledText, _ := hash.MarshalText()
 	assert.Equal(t, byte(48), marshalledText[0])
 }
 
