@@ -48,8 +48,8 @@ func runCmd() *cobra.Command {
 				bootstrapIP,
 				bootstrapPort,
 				true,
-				state.NewAddress("0x9F0d31dFE801cc74ED9e50F06aDC7B168FF2F35b"), // should be able to get this on sync
-				"dlpFQpJJ0P0JwwBjHpaPsDqheGHAhUuYjWl9/gs7rlY=",
+				state.NewAddress("0xE924010A83925452C3B79240FC38e825a0B509bA"), // should be able to get this on sync? otherwise ip <-> address is neeeded...
+				"",
 				false,
 			)
 			// decrypt encryption public key
