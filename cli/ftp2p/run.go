@@ -41,7 +41,7 @@ func runCmd() *cobra.Command {
 			fmt.Println("")
 			fmt.Println(fmt.Sprintf("\t\t Version %s.%s.%s-beta", Major, Minor, Patch))
 			fmt.Printf("\t\t Using address: %s\n", rainbow.Green(miner))
-			fmt.Printf("\t\t Using bootstrap node: %s:%s\n", rainbow.Green("127.0.0.1"), rainbow.Green(fmt.Sprint(8080)))
+			fmt.Printf("\t\t Using bootstrap node: %s:%s\n", rainbow.Green(bootstrapIP), rainbow.Green(fmt.Sprint(bootstrapPort)))
 			fmt.Println("")
 			bootstrap := node.NewPeerNode(
 				"tony",
