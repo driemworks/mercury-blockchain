@@ -105,9 +105,6 @@ func GetEncryptionPublicKey(receiverAddress string) string {
 
 // Encrypt plain data
 func Encrypt(senderPublicKey, senderPrivateKey, receiverPublicKey [32]byte, data []byte, version string) (*EncryptedData, error) {
-	// fmt.Printf("senderPublicKey: %x\n", senderPublicKey)
-	// fmt.Printf("senderPrivateKey: %x\n", senderPrivateKey)
-	// fmt.Printf("receiverPublicKey: %x\n", receiverPublicKey)
 	switch version {
 	case X25519:
 		var nonce [24]byte

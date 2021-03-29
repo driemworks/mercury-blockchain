@@ -61,21 +61,21 @@ func TestNode_Mining(t *testing.T) {
 
 	// Schedule a new TX in 3 seconds from now, in a separate thread
 	// because the n.Run() few lines below is a blocking call
-	// go func() {
-	// 	time.Sleep(time.Second * miningIntervalSeconds / 3)
-	// 	tx := manifest.SignedTx{manifest.NewTx(manifest.NewAddress("tony"), manifest.NewAddress("tonya"), manifest.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH"), 10, 0), []byte{}}
+	go func() {
+		time.Sleep(time.Second * miningIntervalSeconds / 3)
+		tx := state.SignedTx{state.NewTx(state.NewAddress("tony"), state.NewAddress("tonay"), state.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", "ipfs.io"), 10, 0), []byte{}}
 
-	// 	_ = n.AddPendingTX(tx, nInfo)
-	// }()
+		_ = n.AddPendingTX(tx)
+	}()
 
 	// Schedule a new TX in 12 seconds from now simulating
 	// that it came in - while the first TX is being mined
-	// go func() {
-	// 	time.Sleep(time.Second*miningIntervalSeconds + 2)
-	// 	tx := manifest.SignedTx{manifest.NewTx(manifest.NewAddress("tony"), manifest.NewAddress("theo"), manifest.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH"), 10, 0), []byte{}}
+	go func() {
+		time.Sleep(time.Second*miningIntervalSeconds + 2)
+		tx := state.SignedTx{state.NewTx(state.NewAddress("tony"), state.NewAddress("theo"), state.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", "ipfs.io"), 10, 0), []byte{}}
 
-	// 	_ = n.AddPendingTX(tx, nInfo)
-	// }()
+		_ = n.AddPendingTX(tx)
+	}()
 
 	go func() {
 		// Periodically check if we mined the 2 blocks

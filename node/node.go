@@ -109,11 +109,6 @@ func (n *Node) Run(ctx context.Context) error {
 	/*
 		READ OPERATIONS
 	*/
-	// generic blockchain query?
-	http.HandleFunc("/read", func(w http.ResponseWriter, r *http.Request) {
-		blockchainQueryHandler(w, r, n)
-	})
-
 	http.HandleFunc("/inbox", func(w http.ResponseWriter, r *http.Request) {
 		inboxHandler(w, r, n)
 	})
@@ -251,8 +246,8 @@ func (n *Node) IsKnownPeer(peer PeerNode) bool {
 }
 
 /**
-*
- */
+Add a pending transaction to the node's pending transactions array
+*/
 func (n *Node) AddPendingTX(tx state.SignedTx) error {
 	txHash, err := tx.Hash()
 	if err != nil {
@@ -293,6 +288,7 @@ func (n *Node) AddPendingTX(tx state.SignedTx) error {
 		// increase the account nonce => allows us to support mining blocks with multiple transactions
 		n.state.PendingAccount2Nonce[tx.From]++
 		tmpTo := n.state.Manifest[tx.To]
+		// needed?
 		if tmpTo.Inbox == nil {
 			tmpTo.Sent = make([]state.SentItem, 0)
 			tmpTo.Inbox = make([]state.InboxItem, 0)

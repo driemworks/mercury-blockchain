@@ -11,11 +11,14 @@ If you're familiar with pinning services (such as [this one](https://pinata.clou
 - install `ipfs` (recommended)
 
 ### Installation 
-Install f2p2p using:
+
+- Install ftp2p from the source by cloning this repo and run `go install ./cli/...` from the root directory `ftp2p/`.
+
+
+- (TODO) Install f2p2p using:
 ```
 go get github.com/driemworks/ftp2p/master
 ```
-(Recommnded) Install ftp2p from the source by cloning this repo and run `go install ./cli/...` from the root directory `ftp2p/`.
 
 ## Usage
 ### CLI commands
