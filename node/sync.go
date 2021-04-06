@@ -158,7 +158,7 @@ func (n *Node) joinKnownPeers(peer com.PeerNode) error {
 	}
 
 	url := fmt.Sprintf(
-		"http://%s%s?%s=%s&%s=%d&%s=%s&%s=%s&%s=%s",
+		"http://%s%s?%s=%s&%s=%d&%s=%s&%s=%s",
 		peer.TcpAddress(),
 		endpointAddPeer,
 		endpointAddPeerQueryKeyIP, n.info.IP,
