@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	com "ftp2p/common"
 	"ftp2p/state"
 	"os"
 	"path/filepath"
@@ -18,7 +19,7 @@ func TestNode_Run(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	n := NewNode("testAlias", datadir, "127.0.0.1", 8085, state.NewAddress("test"), "", NewPeerNode(
+	n := NewNode("testAlias", datadir, "127.0.0.1", 8085, state.NewAddress("test"), "", com.NewPeerNode(
 		"", "127.0.0.1", 8080, false, common.Address{}, "", true,
 	))
 
@@ -39,7 +40,7 @@ func TestNode_Mining(t *testing.T) {
 
 	// Required for AddPendingTX() to describe
 	// from what node the TX came from (local node in this case)
-	nInfo := NewPeerNode(
+	nInfo := com.NewPeerNode(
 		"test",
 		"127.0.0.1",
 		8085,
@@ -63,7 +64,9 @@ func TestNode_Mining(t *testing.T) {
 	// because the n.Run() few lines below is a blocking call
 	go func() {
 		time.Sleep(time.Second * miningIntervalSeconds / 3)
-		tx := state.SignedTx{state.NewTx(state.NewAddress("tony"), state.NewAddress("tonay"), state.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", "ipfs.io"), 10, 0), []byte{}}
+		tx := state.SignedTx{state.NewTx(state.NewAddress("tony"), state.NewAddress("tonay"),
+			state.TransactionPayload{state.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", "ipfs.io")},
+			10, 0, state.TX_TYPE_001), []byte{}}
 
 		_ = n.AddPendingTX(tx)
 	}()
@@ -72,7 +75,8 @@ func TestNode_Mining(t *testing.T) {
 	// that it came in - while the first TX is being mined
 	go func() {
 		time.Sleep(time.Second*miningIntervalSeconds + 2)
-		tx := state.SignedTx{state.NewTx(state.NewAddress("tony"), state.NewAddress("theo"), state.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", "ipfs.io"), 10, 0), []byte{}}
+		tx := state.SignedTx{state.NewTx(state.NewAddress("tony"), state.NewAddress("theo"),
+			state.TransactionPayload{state.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", "ipfs.io")}, 10, 0, state.TX_TYPE_001), []byte{}}
 
 		_ = n.AddPendingTX(tx)
 	}()

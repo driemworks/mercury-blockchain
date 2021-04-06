@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	com "ftp2p/common"
 	"ftp2p/state"
 	"ftp2p/wallet"
 	"math"
@@ -125,7 +126,7 @@ func knownPeersHandler(w http.ResponseWriter, r *http.Request, node *Node) {
  */
 func trustedPeersHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	trustedPeers := make([]peerResponse, 0, len(node.trustedPeers))
-	for _, n := range node.trustedPeers {
+	for _, n := range node.state.Manifest[node.info.Address].TrustedPeers {
 		trustedPeers = append(trustedPeers, peerResponse{n.Address.Hex(), n.Name, n.IP, n.Port, n.EncryptionPublicKey})
 	}
 	writeRes(w, trustedPeersResponse{trustedPeers})
@@ -153,7 +154,7 @@ func sendCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		writeErrRes(w, fmt.Errorf("%s is an invalid 'to' address", to.String()))
 		return
 	}
-	// TODO tx cost no FTC for now
+	// TODO tx costs no FTC for now
 	// check that the pending balance is greater than zero
 	// if node.state.Manifest[from].Balance <= float32(0) {
 	// 	writeErrRes(w, fmt.Errorf("your pending balance is non-positive. Please add funds and try again"))
@@ -168,7 +169,8 @@ func sendCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	nonce := node.state.PendingAccount2Nonce[node.info.Address] + 1
 	// TODO - the cost to send a cid is always 1?
 	// should this really go to the tx's to value, or to the 'system' (bootstrap) node?
-	tx := state.NewTx(from, state.NewAddress(req.To), state.NewCID(req.Cid, req.Gateway), nonce, 0)
+	tx := state.NewTx(from, state.NewAddress(req.To),
+		state.TransactionPayload{state.NewCID(req.Cid, req.Gateway)}, nonce, 0, state.TX_TYPE_001)
 	signedTx, err := wallet.SignTxWithKeystoreAccount(
 		tx, node.info.Address, req.FromPwd, wallet.GetKeystoreDirPath(node.datadir))
 	if err != nil {
@@ -196,8 +198,25 @@ func addTrustedPeerNodeHandler(w http.ResponseWriter, r *http.Request, node *Nod
 		w.Write([]byte("{\"error_code\": \"ERR_001\", \"error_desc\": \"no known node with provided address\"}"))
 	}
 	node.trustedPeers[req.TcpAddress] = node.knownPeers[req.TcpAddress]
-	// TODO write trusted peers to a file.. perhaps as a transaction
-	writeRes(w, struct{ trustedPeers map[string]PeerNode }{
+	nonce := node.state.PendingAccount2Nonce[node.info.Address] + 1
+	peerNode := node.knownPeers[req.TcpAddress]
+	tx := state.NewTx(node.info.Address, node.knownPeers[req.TcpAddress].Address,
+		state.TransactionPayload{
+			state.NewTrustPeerTransactionPayload(peerNode)},
+		nonce, 0, state.TX_TYPE_002)
+	signedTx, err := wallet.SignTxWithKeystoreAccount(
+		tx, node.info.Address, "test", wallet.GetKeystoreDirPath(node.datadir))
+	// TODO get rid of this password field completely in request
+	if err != nil {
+		writeErrRes(w, err)
+		return
+	}
+	err = node.AddPendingTX(signedTx)
+	if err != nil {
+		writeErrRes(w, err)
+		return
+	}
+	writeRes(w, struct{ trustedPeers map[string]com.PeerNode }{
 		node.trustedPeers,
 	})
 }
@@ -219,7 +238,9 @@ func sendTokensHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	}
 	from := node.info.Address
 	nonce := node.state.PendingAccount2Nonce[node.info.Address] + 1
-	tx := state.NewTx(from, state.NewAddress(req.To), state.NewCID("", ""), nonce, float32(req.Amount))
+	tx := state.NewTx(from, state.NewAddress(req.To),
+		state.TransactionPayload{state.NewCID("", "")}, nonce,
+		float32(req.Amount), state.TX_TYPE_001)
 	signedTx, err := wallet.SignTxWithKeystoreAccount(tx, from, req.FromPwd,
 		wallet.GetKeystoreDirPath(node.datadir))
 	if err != nil {

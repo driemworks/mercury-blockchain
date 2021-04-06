@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	com "ftp2p/common"
 	"ftp2p/logging"
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/raphamorim/go-rainbow"
@@ -15,6 +17,7 @@ import (
 
 const BlockReward = float32(100)
 
+// TODO used as both a request and response... maybe move to common?
 type CID struct {
 	CID         string `json:"cid"`
 	IPFSGateway string `json:"ipfs_gateway"`
@@ -35,10 +38,11 @@ type InboxItem struct {
 }
 
 type Manifest struct {
-	Sent           []SentItem  `json:"sent"`
-	Inbox          []InboxItem `json:"inbox"`
-	Balance        float32     `json:"balance"`
-	PendingBalance float32     `json:"pending_balance"`
+	Sent           []SentItem     `json:"sent"`
+	Inbox          []InboxItem    `json:"inbox"`
+	Balance        float32        `json:"balance"`
+	PendingBalance float32        `json:"pending_balance"`
+	TrustedPeers   []com.PeerNode `json:"trusted_peers"`
 }
 
 type State struct {
@@ -70,7 +74,7 @@ func NewStateFromDisk(datadir string) (*State, error) {
 	// using manifest as var and Manifest as type, but they are not the same thing
 	manifest := make(map[common.Address]Manifest)
 	for account, mailbox := range gen.Manifest {
-		manifest[account] = Manifest{mailbox.Sent, mailbox.Inbox, mailbox.Balance, mailbox.PendingBalance}
+		manifest[account] = Manifest{mailbox.Sent, mailbox.Inbox, mailbox.Balance, mailbox.PendingBalance, mailbox.TrustedPeers}
 	}
 
 	blockDbFile, err := os.OpenFile(getBlocksDbFilePath(datadir, false), os.O_APPEND|os.O_RDWR, 0600)
@@ -270,7 +274,7 @@ func (s *State) NextBlockNumber() uint64 {
 	return s.LatestBlock().Header.Number + 1
 }
 
-/**
+/*
 *
  */
 func applyTXs(txs []SignedTx, s *State) error {
@@ -316,20 +320,53 @@ func applyTx(tx SignedTx, s *State) error {
 	if err != nil {
 		return fmt.Errorf("bad Tx. Can't calculate tx hash")
 	}
-
-	var senderMailbox = s.Manifest[tx.From]
-	senderMailbox.Sent = append(senderMailbox.Sent, SentItem{tx.To, tx.CID, txHash, tx.Amount})
-	senderMailbox.Balance = senderMailbox.PendingBalance
-	s.Manifest[tx.From] = senderMailbox
-	// update recipient inbox items
-	var receipientMailbox = s.Manifest[tx.To]
-	receipientMailbox.Balance += tx.Amount
-	// add a new inbox item if there is a CID
-	if !tx.CID.IsEmpty() {
-		receipientMailbox.Inbox = append(receipientMailbox.Inbox, InboxItem{tx.From, tx.CID, txHash, tx.Amount})
+	// could ignore transactions that aren't mine?
+	payload := tx.Payload
+	if tx.Type == TX_TYPE_001 {
+		// map the payload to a CID
+		var cid CID
+		// TODO: Is this really a good way to handle the different unmarshal outputs?
+		switch t := payload.Value.(type) {
+		case map[string]interface{}:
+			cid_string := fmt.Sprintf("%v", t["cid"])
+			gateway_string := fmt.Sprintf("%v", t["ipfs_gateway"])
+			cid = NewCID(cid_string, gateway_string)
+		default:
+			cid = payload.Value.(CID)
+		}
+		var senderMailbox = s.Manifest[tx.From]
+		senderMailbox.Sent = append(senderMailbox.Sent, SentItem{tx.To, cid, txHash, tx.Amount})
+		senderMailbox.Balance = senderMailbox.PendingBalance
+		s.Manifest[tx.From] = senderMailbox
+		// update recipient inbox items
+		var receipientMailbox = s.Manifest[tx.To]
+		receipientMailbox.Balance += tx.Amount
+		// add a new inbox item if there is a CID
+		if !cid.IsEmpty() {
+			receipientMailbox.Inbox = append(receipientMailbox.Inbox, InboxItem{tx.From, cid, txHash, tx.Amount})
+		}
+		s.Manifest[tx.To] = receipientMailbox
+		s.Account2Nonce[tx.From] = tx.Nonce
+	} else if tx.Type == TX_TYPE_002 {
+		var peerNode com.PeerNode
+		switch t := payload.Value.(type) {
+		case map[string]interface{}:
+			name := fmt.Sprintf("%v", t["name"])
+			ip := fmt.Sprintf("%v", t["ip"])
+			port, _ := strconv.ParseUint(fmt.Sprintf("%v", t["port"]), 10, 64)
+			isBootstrap, _ := strconv.ParseBool(fmt.Sprintf("%v", t["is_bootstrap"]))
+			address := NewAddress(fmt.Sprintf("%v", t["address"]))
+			peerNode = com.NewPeerNode(
+				name, ip, port, isBootstrap, address, "", true,
+			)
+		default:
+			peerNode = tx.Payload.Value.(com.PeerNode)
+		}
+		trustedPeersClone := s.Manifest[tx.From]
+		trustedPeersClone.TrustedPeers = append(s.Manifest[tx.From].TrustedPeers, peerNode)
+		s.Manifest[tx.From] = trustedPeersClone
+		fmt.Println("Adding trusted peer from transaction")
 	}
-	s.Manifest[tx.To] = receipientMailbox
-	s.Account2Nonce[tx.From] = tx.Nonce
 	return nil
 }
 
@@ -355,10 +392,16 @@ func (s *State) LatestBlockHash() Hash {
 	return s.latestBlockHash
 }
 
+/*
+* Get the latest block from the current state
+ */
 func (s *State) LatestBlock() Block {
 	return s.latestBlock
 }
 
+/*
+* Copy the state
+ */
 func (s *State) copy() State {
 	copy := State{}
 	copy.hasGenesisBlock = s.hasGenesisBlock
@@ -377,6 +420,9 @@ func (s *State) copy() State {
 	return copy
 }
 
+/*
+ Get all blocks in 'datadir' whose parent is a child of the block with the given block hash
+*/
 func GetBlocksAfter(blockHash Hash, dataDir string) ([]Block, error) {
 	// open block.db
 	f, err := os.OpenFile(getBlocksDbFilePath(dataDir, false), os.O_RDONLY, 0600)

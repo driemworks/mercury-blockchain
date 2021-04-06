@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	com "ftp2p/common"
 	"ftp2p/logging"
 	"ftp2p/state"
 	"net/http"
@@ -16,28 +17,14 @@ import (
 const miningIntervalSeconds = 45
 const syncIntervalSeconds = 30
 
-type PeerNode struct {
-	Name                string         `json:"name"`
-	IP                  string         `json:"ip"`
-	Port                uint64         `json:"port"`
-	IsBootstrap         bool           `json:"is_bootstrap"`
-	Address             common.Address `json:"address"`
-	EncryptionPublicKey string         `json:"encryption_public_key"`
-	connected           bool
-}
-
-func (p PeerNode) TcpAddress() string {
-	return fmt.Sprintf("%s:%d", p.IP, p.Port)
-}
-
 type Node struct {
 	datadir         string
 	ip              string
 	port            uint64
 	state           *state.State
-	info            PeerNode
-	knownPeers      map[string]PeerNode
-	trustedPeers    map[string]PeerNode
+	info            com.PeerNode
+	knownPeers      map[string]com.PeerNode
+	trustedPeers    map[string]com.PeerNode
 	pendingTXs      map[string]state.SignedTx
 	archivedTXs     map[string]state.SignedTx
 	newSyncedBlocks chan state.Block
@@ -48,8 +35,8 @@ type Node struct {
 
 func NewNode(name string, datadir string, ip string, port uint64,
 	address common.Address, encryptionPublicKey string,
-	bootstrap PeerNode) *Node {
-	knownPeers := make(map[string]PeerNode)
+	bootstrap com.PeerNode) *Node {
+	knownPeers := make(map[string]com.PeerNode)
 	knownPeers[bootstrap.TcpAddress()] = bootstrap
 	return &Node{
 		name:            name,
@@ -57,18 +44,14 @@ func NewNode(name string, datadir string, ip string, port uint64,
 		ip:              ip,
 		port:            port,
 		knownPeers:      knownPeers,
-		trustedPeers:    make(map[string]PeerNode),
-		info:            NewPeerNode(name, ip, port, false, address, encryptionPublicKey, true),
+		trustedPeers:    make(map[string]com.PeerNode),
+		info:            com.NewPeerNode(name, ip, port, false, address, encryptionPublicKey, true),
 		pendingTXs:      make(map[string]state.SignedTx),
 		archivedTXs:     make(map[string]state.SignedTx),
 		newSyncedBlocks: make(chan state.Block),
 		newPendingTXs:   make(chan state.SignedTx, 10000),
 		isMining:        false,
 	}
-}
-
-func NewPeerNode(name string, ip string, port uint64, isBootstrap bool, address common.Address, encryptionPublicKey string, connected bool) PeerNode {
-	return PeerNode{name, ip, port, isBootstrap, address, encryptionPublicKey, connected}
 }
 
 /**
@@ -92,9 +75,9 @@ func (n *Node) Run(ctx context.Context) error {
 		sendCIDHandler(w, r, n)
 	})
 	// add a PeerNode to the trusted peers slice
-	// http.HandleFunc("/peers/trusted/add", func(w http.ResponseWriter, r *http.Request) {
-	// 	addTrustedPeerNodeHandler(w, r, n)
-	// })
+	http.HandleFunc("/peers/trusted/add", func(w http.ResponseWriter, r *http.Request) {
+		addTrustedPeerNodeHandler(w, r, n)
+	})
 	/*
 		ENCRYPTION OPERATIONS
 	*/
@@ -227,15 +210,15 @@ func (n *Node) removeMinedPendingTXs(block state.Block) {
 	}
 }
 
-func (n *Node) AddPeer(peer PeerNode) {
+func (n *Node) AddPeer(peer com.PeerNode) {
 	n.knownPeers[peer.TcpAddress()] = peer
 }
 
-func (n *Node) RemovePeer(peer PeerNode) {
+func (n *Node) RemovePeer(peer com.PeerNode) {
 	delete(n.knownPeers, peer.TcpAddress())
 }
 
-func (n *Node) IsKnownPeer(peer PeerNode) bool {
+func (n *Node) IsKnownPeer(peer com.PeerNode) bool {
 	if peer.IP == n.info.IP && peer.Port == n.info.Port {
 		return true
 	}
@@ -285,7 +268,7 @@ func (n *Node) AddPendingTX(tx state.SignedTx) error {
 			tmpFrom.PendingBalance -= tx.Amount
 		}
 		n.state.Manifest[tx.From] = tmpFrom
-		// increase the account nonce => allows us to support mining blocks with multiple transactions
+		// increase the account to nonce value => allows us to support mining blocks with multiple transactions
 		n.state.PendingAccount2Nonce[tx.From]++
 		tmpTo := n.state.Manifest[tx.To]
 		// needed?

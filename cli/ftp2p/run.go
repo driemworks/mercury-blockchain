@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"ftp2p/common"
 	"ftp2p/node"
 	"ftp2p/state"
 	"ftp2p/wallet"
@@ -43,7 +44,7 @@ func runCmd() *cobra.Command {
 			fmt.Printf("\t\t Using address: %s\n", rainbow.Green(miner))
 			fmt.Printf("\t\t Using bootstrap node: %s:%s\n", rainbow.Green(bootstrapIP), rainbow.Green(fmt.Sprint(bootstrapPort)))
 			fmt.Println("")
-			bootstrap := node.NewPeerNode(
+			bootstrap := common.NewPeerNode(
 				"bootstrap",
 				bootstrapIP,
 				bootstrapPort,

@@ -64,7 +64,8 @@ func TestMineWithTimeout(t *testing.T) {
 
 func createRandomPendingBlock(miner common.Address) PendingBlock {
 	return NewPendingBlock(state.Hash{}, 0, miner, []state.SignedTx{
-		{state.Tx{From: state.NewAddress("tony"), To: state.NewAddress("theo"), CID: state.NewCID("", "")}, []byte{}},
+		{state.Tx{From: state.NewAddress("tony"), To: state.NewAddress("theo"),
+			Payload: state.TransactionPayload{state.NewCID("", "")}}, []byte{}},
 	},
 	)
 }

@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	com "ftp2p/common"
 	"ftp2p/wallet"
 	"net/http"
 )
@@ -14,7 +15,7 @@ func encryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		return
 	}
 	// if req.To not provided, peer node is yourself
-	var trustedPeerNode PeerNode
+	var trustedPeerNode com.PeerNode
 	if req.To == "" {
 		trustedPeerNode = node.info
 	} else {
