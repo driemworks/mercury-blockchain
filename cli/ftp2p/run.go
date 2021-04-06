@@ -50,7 +50,6 @@ func runCmd() *cobra.Command {
 				bootstrapPort,
 				true,
 				state.NewAddress(""), // 0x96131b31b9935f6388502b502cf544c1a8c65ad6
-				"",
 				false,
 			)
 			// decrypt encryption public key

@@ -357,7 +357,7 @@ func applyTx(tx SignedTx, s *State) error {
 			isBootstrap, _ := strconv.ParseBool(fmt.Sprintf("%v", t["is_bootstrap"]))
 			address := NewAddress(fmt.Sprintf("%v", t["address"]))
 			peerNode = com.NewPeerNode(
-				name, ip, port, isBootstrap, address, "", true,
+				name, ip, port, isBootstrap, address, true,
 			)
 		default:
 			peerNode = tx.Payload.Value.(com.PeerNode)

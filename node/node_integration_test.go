@@ -20,7 +20,7 @@ func TestNode_Run(t *testing.T) {
 	}
 
 	n := NewNode("testAlias", datadir, "127.0.0.1", 8085, state.NewAddress("test"), "", com.NewPeerNode(
-		"", "127.0.0.1", 8080, false, common.Address{}, "", true,
+		"", "127.0.0.1", 8080, false, common.Address{}, true,
 	))
 
 	ctx, _ := context.WithTimeout(context.Background(), time.Second*5)
@@ -46,7 +46,6 @@ func TestNode_Mining(t *testing.T) {
 		8085,
 		false,
 		state.NewAddress("0x9F0d31dFE801cc74ED9e50F06aDC7B168FF2F35b"),
-		"",
 		true,
 	)
 

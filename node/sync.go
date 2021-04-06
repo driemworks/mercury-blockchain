@@ -2,7 +2,6 @@ package node
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	com "ftp2p/common"
 	"ftp2p/state"
@@ -166,7 +165,6 @@ func (n *Node) joinKnownPeers(peer com.PeerNode) error {
 		endpointAddPeerQueryKeyPort, n.info.Port,
 		endpointAddPeerQueryKeyMiner, n.info.Address,
 		endpointAddNameQueryKeyName, n.info.Name,
-		"publicKey", base64.StdEncoding.EncodeToString([]byte(n.info.EncryptionPublicKey)),
 	)
 
 	res, err := http.Get(url)

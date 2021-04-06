@@ -28,11 +28,10 @@ type listInfoResponse struct {
 }
 
 type peerResponse struct {
-	Address   string `json:"address"`
-	Name      string `json:"name"`
-	IP        string `json:"ip"`
-	Port      uint64 `json:"port"`
-	PublicKey string `json:"public_key"`
+	Address string `json:"address"`
+	Name    string `json:"name"`
+	IP      string `json:"ip"`
+	Port    uint64 `json:"port"`
 }
 
 type knownPeersResponse struct {
@@ -117,7 +116,7 @@ func infoHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 func knownPeersHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	knownPeers := make([]peerResponse, 0, len(node.knownPeers))
 	for _, n := range node.knownPeers {
-		knownPeers = append(knownPeers, peerResponse{n.Address.Hex(), n.Name, n.IP, n.Port, n.EncryptionPublicKey})
+		knownPeers = append(knownPeers, peerResponse{n.Address.Hex(), n.Name, n.IP, n.Port})
 	}
 	writeRes(w, knownPeersResponse{knownPeers})
 }
@@ -127,7 +126,7 @@ func knownPeersHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 func trustedPeersHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	trustedPeers := make([]peerResponse, 0, len(node.trustedPeers))
 	for _, n := range node.state.Manifest[node.info.Address].TrustedPeers {
-		trustedPeers = append(trustedPeers, peerResponse{n.Address.Hex(), n.Name, n.IP, n.Port, n.EncryptionPublicKey})
+		trustedPeers = append(trustedPeers, peerResponse{n.Address.Hex(), n.Name, n.IP, n.Port})
 	}
 	writeRes(w, trustedPeersResponse{trustedPeers})
 }

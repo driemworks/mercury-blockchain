@@ -27,7 +27,7 @@ func encryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	}
 
 	var recipientKey [32]byte
-	copy(recipientKey[:], []byte(trustedPeerNode.EncryptionPublicKey))
+	copy(recipientKey[:], []byte{}) // TODO
 	if trustedPeerNode.IP == "" {
 		writeErrRes(w, fmt.Errorf("node with address %s is not a trusted peer", req.To))
 	}

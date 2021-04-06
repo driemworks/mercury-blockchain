@@ -39,18 +39,17 @@ type TransactionPayload struct {
 
 func NewTrustPeerTransactionPayload(pn com.PeerNode) TrustPeerTransactionPayload {
 	return TrustPeerTransactionPayload{
-		pn.Address, pn.EncryptionPublicKey, pn.IP, pn.IsBootstrap, pn.Name, pn.Port,
+		pn.Address, pn.IP, pn.IsBootstrap, pn.Name, pn.Port,
 	}
 }
 
 // everything in PeerNode except the Connected field
 type TrustPeerTransactionPayload struct {
-	Address             common.Address `json:"address"`
-	EncryptionPublicKey string         `json:"encryption_public_key"`
-	IP                  string         `json:"ip"`
-	IsBootstrap         bool           `json:"is_bootstrap"`
-	Name                string         `json:"name"`
-	Port                uint64         `json:"port"`
+	Address     common.Address `json:"address"`
+	IP          string         `json:"ip"`
+	IsBootstrap bool           `json:"is_bootstrap"`
+	Name        string         `json:"name"`
+	Port        uint64         `json:"port"`
 }
 
 type SignedTx struct {
