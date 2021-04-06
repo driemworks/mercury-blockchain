@@ -3,6 +3,7 @@ package node
 import (
 	"fmt"
 	com "ftp2p/common"
+	"ftp2p/state"
 	"ftp2p/wallet"
 	"net/http"
 )
@@ -27,7 +28,7 @@ func encryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	}
 
 	var recipientKey [32]byte
-	copy(recipientKey[:], []byte{}) // TODO
+	copy(recipientKey[:], state.NewAddress(req.To).Bytes()) // TODO? confirm this works
 	if trustedPeerNode.IP == "" {
 		writeErrRes(w, fmt.Errorf("node with address %s is not a trusted peer", req.To))
 	}

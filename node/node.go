@@ -82,13 +82,13 @@ func (n *Node) Run(ctx context.Context) error {
 		ENCRYPTION OPERATIONS
 	*/
 	// for now, only allow string data, but change that in the future
-	// http.HandleFunc("/encrypt", func(w http.ResponseWriter, r *http.Request) {
-	// 	encryptDataHandler(w, r, n)
-	// })
-	// // decrypt some data
-	// http.HandleFunc("/decrypt", func(w http.ResponseWriter, r *http.Request) {
-	// 	decryptDataHandler(w, r, n)
-	// })
+	http.HandleFunc("/encrypt", func(w http.ResponseWriter, r *http.Request) {
+		encryptDataHandler(w, r, n)
+	})
+	// decrypt some data
+	http.HandleFunc("/decrypt", func(w http.ResponseWriter, r *http.Request) {
+		decryptDataHandler(w, r, n)
+	})
 	/*
 		READ OPERATIONS
 	*/
