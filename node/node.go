@@ -4,8 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	com "ftp2p/common"
-	"ftp2p/logging"
+	"ftp2p/core"
 	"ftp2p/state"
 	"net/http"
 	"time"
@@ -22,9 +21,9 @@ type Node struct {
 	ip              string
 	port            uint64
 	state           *state.State
-	info            com.PeerNode
-	knownPeers      map[string]com.PeerNode
-	trustedPeers    map[string]com.PeerNode
+	info            core.PeerNode
+	knownPeers      map[string]core.PeerNode
+	trustedPeers    map[string]core.PeerNode
 	pendingTXs      map[string]state.SignedTx
 	archivedTXs     map[string]state.SignedTx
 	newSyncedBlocks chan state.Block
@@ -34,8 +33,8 @@ type Node struct {
 }
 
 func NewNode(name string, datadir string, ip string, port uint64,
-	address common.Address, bootstrap com.PeerNode) *Node {
-	knownPeers := make(map[string]com.PeerNode)
+	address common.Address, bootstrap core.PeerNode) *Node {
+	knownPeers := make(map[string]core.PeerNode)
 	knownPeers[bootstrap.TcpAddress()] = bootstrap
 	return &Node{
 		name:            name,
@@ -43,8 +42,8 @@ func NewNode(name string, datadir string, ip string, port uint64,
 		ip:              ip,
 		port:            port,
 		knownPeers:      knownPeers,
-		trustedPeers:    make(map[string]com.PeerNode),
-		info:            com.NewPeerNode(name, ip, port, false, address, true),
+		trustedPeers:    make(map[string]core.PeerNode),
+		info:            core.NewPeerNode(name, ip, port, false, address, true),
 		pendingTXs:      make(map[string]state.SignedTx),
 		archivedTXs:     make(map[string]state.SignedTx),
 		newSyncedBlocks: make(chan state.Block),
@@ -209,15 +208,15 @@ func (n *Node) removeMinedPendingTXs(block state.Block) {
 	}
 }
 
-func (n *Node) AddPeer(peer com.PeerNode) {
+func (n *Node) AddPeer(peer core.PeerNode) {
 	n.knownPeers[peer.TcpAddress()] = peer
 }
 
-func (n *Node) RemovePeer(peer com.PeerNode) {
+func (n *Node) RemovePeer(peer core.PeerNode) {
 	delete(n.knownPeers, peer.TcpAddress())
 }
 
-func (n *Node) IsKnownPeer(peer com.PeerNode) bool {
+func (n *Node) IsKnownPeer(peer core.PeerNode) bool {
 	if peer.IP == n.info.IP && peer.Port == n.info.Port {
 		return true
 	}
@@ -244,7 +243,7 @@ func (n *Node) AddPendingTX(tx state.SignedTx) error {
 		if err != nil {
 			return err
 		}
-		prettyTxJSON, err := logging.PrettyPrintJSON(txJSON)
+		prettyTxJSON, err := core.PrettyPrintJSON(txJSON)
 		if err != nil {
 			return err
 		}

@@ -2,7 +2,7 @@ package node
 
 import (
 	"fmt"
-	com "ftp2p/common"
+	"ftp2p/core"
 	"ftp2p/state"
 	"ftp2p/wallet"
 	"net/http"
@@ -30,12 +30,12 @@ type ErrorResponse struct {
 
 // StatusResponse TODO
 type StatusResponse struct {
-	Hash         state.Hash              `json:"block_hash"`
-	Number       uint64                  `json:"block_number"`
-	Alias        string                  `json:"alias"`
-	KnownPeers   map[string]com.PeerNode `json:"known_peers"`
-	TrustedPeers map[string]com.PeerNode `json:"trusted_peers"`
-	PendingTxs   []state.SignedTx        `json:"pending_txs"`
+	Hash         state.Hash               `json:"block_hash"`
+	Number       uint64                   `json:"block_number"`
+	Alias        string                   `json:"alias"`
+	KnownPeers   map[string]core.PeerNode `json:"known_peers"`
+	TrustedPeers map[string]core.PeerNode `json:"trusted_peers"`
+	PendingTxs   []state.SignedTx         `json:"pending_txs"`
 }
 
 type TokenRequestResponse struct {
@@ -142,7 +142,7 @@ func addPeerHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		writeRes(w, AddPeerRes{false, err.Error()})
 		return
 	}
-	peer := com.NewPeerNode(peerName, peerIP, peerPort, false, state.NewAddress(minerRaw), true)
+	peer := core.NewPeerNode(peerName, peerIP, peerPort, false, state.NewAddress(minerRaw), true)
 	node.AddPeer(peer)
 	fmt.Printf("Peer "+rainbow.Green("'%s'")+" was added into KnownPeers\n", peer.TcpAddress())
 	writeRes(w, AddPeerRes{true, ""})

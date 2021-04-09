@@ -3,7 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
-	com "ftp2p/common"
+	"ftp2p/core"
 	"ftp2p/state"
 	"net/http"
 	"time"
@@ -80,7 +80,7 @@ func (n *Node) doSync() {
 	}
 }
 
-func (n *Node) syncBlocks(peer com.PeerNode, status StatusResponse) error {
+func (n *Node) syncBlocks(peer core.PeerNode, status StatusResponse) error {
 	localBlockNumber := n.state.LatestBlock().Header.Number
 	// If the peer has no blocks, ignore it
 	if status.Hash.IsEmpty() {
@@ -152,7 +152,7 @@ func (n *Node) syncPendingTXs(txs []state.SignedTx) error {
 	return nil
 }
 
-func (n *Node) joinKnownPeers(peer com.PeerNode) error {
+func (n *Node) joinKnownPeers(peer core.PeerNode) error {
 	if peer.Connected {
 		return nil
 	}
@@ -193,7 +193,7 @@ func (n *Node) joinKnownPeers(peer com.PeerNode) error {
 	return nil
 }
 
-func queryPeerStatus(peer com.PeerNode) (StatusResponse, error) {
+func queryPeerStatus(peer core.PeerNode) (StatusResponse, error) {
 	url := fmt.Sprintf("http://%s%s", peer.TcpAddress(), endpointStatus)
 	res, err := http.Get(url)
 	if err != nil {
@@ -209,7 +209,7 @@ func queryPeerStatus(peer com.PeerNode) (StatusResponse, error) {
 	return StatusResponse, nil
 }
 
-func fetchBlocksFromPeer(peer com.PeerNode, fromBlock state.Hash) ([]state.Block, error) {
+func fetchBlocksFromPeer(peer core.PeerNode, fromBlock state.Hash) ([]state.Block, error) {
 	fmt.Printf("Importing blocks from Peer %s...\n", rainbow.Bold(rainbow.Green(peer.TcpAddress())))
 
 	url := fmt.Sprintf(

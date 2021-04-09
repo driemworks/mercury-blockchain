@@ -91,7 +91,7 @@ func Encrypt(receiverPublicKey [32]byte, data []byte, version string) (*Encrypte
 }
 
 // Decrypt some encrypted data.
-func Decrypt(password string, keystoredir string, encryptedData *EncryptedData) ([]byte, error) {
+func Decrypt(password string, keystoredir string, encryptedData EncryptedData) ([]byte, error) {
 	switch encryptedData.Version {
 	case X25519:
 		// assemble decryption parameters

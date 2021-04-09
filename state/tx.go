@@ -4,9 +4,7 @@ import (
 	"crypto/elliptic"
 	"crypto/sha256"
 	"encoding/json"
-	com "ftp2p/common"
-
-	// com "ftp2p/common"
+	"ftp2p/core"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -37,7 +35,7 @@ type TransactionPayload struct {
 	Value interface{}
 }
 
-func NewTrustPeerTransactionPayload(pn com.PeerNode) TrustPeerTransactionPayload {
+func NewTrustPeerTransactionPayload(pn core.PeerNode) TrustPeerTransactionPayload {
 	return TrustPeerTransactionPayload{
 		pn.Address, pn.IP, pn.IsBootstrap, pn.Name, pn.Port,
 	}

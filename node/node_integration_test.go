@@ -2,7 +2,7 @@ package node
 
 import (
 	"context"
-	com "ftp2p/common"
+	"ftp2p/core"
 	"ftp2p/state"
 	"os"
 	"path/filepath"
@@ -19,7 +19,7 @@ func TestNode_Run(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	n := NewNode("testAlias", datadir, "127.0.0.1", 8085, state.NewAddress("test"), com.NewPeerNode(
+	n := NewNode("testAlias", datadir, "127.0.0.1", 8085, state.NewAddress("test"), core.NewPeerNode(
 		"", "127.0.0.1", 8080, false, common.Address{}, true,
 	))
 
@@ -40,7 +40,7 @@ func TestNode_Mining(t *testing.T) {
 
 	// Required for AddPendingTX() to describe
 	// from what node the TX came from (local node in this case)
-	nInfo := com.NewPeerNode(
+	nInfo := core.NewPeerNode(
 		"test",
 		"127.0.0.1",
 		8085,

@@ -2,7 +2,7 @@ package node
 
 import (
 	"fmt"
-	com "ftp2p/common"
+	"ftp2p/core"
 	"ftp2p/state"
 	"ftp2p/wallet"
 	"math"
@@ -215,7 +215,7 @@ func addTrustedPeerNodeHandler(w http.ResponseWriter, r *http.Request, node *Nod
 		writeErrRes(w, err)
 		return
 	}
-	writeRes(w, struct{ trustedPeers map[string]com.PeerNode }{
+	writeRes(w, struct{ trustedPeers map[string]core.PeerNode }{
 		node.trustedPeers,
 	})
 }

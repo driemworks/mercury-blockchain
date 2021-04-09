@@ -4,8 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	com "ftp2p/common"
-	"ftp2p/logging"
+	"ftp2p/core"
 	"os"
 	"reflect"
 	"sort"
@@ -38,11 +37,11 @@ type InboxItem struct {
 }
 
 type Manifest struct {
-	Sent           []SentItem     `json:"sent"`
-	Inbox          []InboxItem    `json:"inbox"`
-	Balance        float32        `json:"balance"`
-	PendingBalance float32        `json:"pending_balance"`
-	TrustedPeers   []com.PeerNode `json:"trusted_peers"`
+	Sent           []SentItem      `json:"sent"`
+	Inbox          []InboxItem     `json:"inbox"`
+	Balance        float32         `json:"balance"`
+	PendingBalance float32         `json:"pending_balance"`
+	TrustedPeers   []core.PeerNode `json:"trusted_peers"`
 }
 
 type State struct {
@@ -160,7 +159,7 @@ func (s *State) AddBlock(b Block) (*State, Hash, error) {
 		return nil, Hash{}, err
 	}
 
-	prettyJSON, err := logging.PrettyPrintJSON(blockFsJSON)
+	prettyJSON, err := core.PrettyPrintJSON(blockFsJSON)
 	fmt.Printf("Persisting new Block to disk:\n")
 	fmt.Printf("\t%s\n", &prettyJSON)
 
@@ -348,7 +347,7 @@ func applyTx(tx SignedTx, s *State) error {
 		s.Manifest[tx.To] = receipientMailbox
 		s.Account2Nonce[tx.From] = tx.Nonce
 	} else if tx.Type == TX_TYPE_002 {
-		var peerNode com.PeerNode
+		var peerNode core.PeerNode
 		switch t := payload.Value.(type) {
 		case map[string]interface{}:
 			name := fmt.Sprintf("%v", t["name"])
@@ -356,11 +355,11 @@ func applyTx(tx SignedTx, s *State) error {
 			port, _ := strconv.ParseUint(fmt.Sprintf("%v", t["port"]), 10, 64)
 			isBootstrap, _ := strconv.ParseBool(fmt.Sprintf("%v", t["is_bootstrap"]))
 			address := NewAddress(fmt.Sprintf("%v", t["address"]))
-			peerNode = com.NewPeerNode(
+			peerNode = core.NewPeerNode(
 				name, ip, port, isBootstrap, address, true,
 			)
 		default:
-			peerNode = tx.Payload.Value.(com.PeerNode)
+			peerNode = tx.Payload.Value.(core.PeerNode)
 		}
 		trustedPeersClone := s.Manifest[tx.From]
 		trustedPeersClone.TrustedPeers = append(s.Manifest[tx.From].TrustedPeers, peerNode)

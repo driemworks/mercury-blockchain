@@ -2,7 +2,7 @@ package node
 
 import (
 	"fmt"
-	com "ftp2p/common"
+	"ftp2p/core"
 	"ftp2p/state"
 	"ftp2p/wallet"
 	"net/http"
@@ -16,7 +16,7 @@ func encryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		return
 	}
 	// if req.To not provided, peer node is yourself
-	var trustedPeerNode com.PeerNode
+	var trustedPeerNode core.PeerNode
 	if req.To == "" {
 		trustedPeerNode = node.info
 	} else {
@@ -40,7 +40,7 @@ func encryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 			writeErrRes(w, err)
 			return
 		}
-		writeRes(w, EncryptDataResponse{EncryptedData: encryptedData})
+		writeRes(w, EncryptDataResponse{EncryptedData: *encryptedData})
 	}
 }
 
