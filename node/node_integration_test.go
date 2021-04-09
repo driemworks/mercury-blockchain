@@ -19,7 +19,7 @@ func TestNode_Run(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	n := NewNode("testAlias", datadir, "127.0.0.1", 8085, state.NewAddress("test"), "", com.NewPeerNode(
+	n := NewNode("testAlias", datadir, "127.0.0.1", 8085, state.NewAddress("test"), com.NewPeerNode(
 		"", "127.0.0.1", 8080, false, common.Address{}, true,
 	))
 
@@ -51,7 +51,7 @@ func TestNode_Mining(t *testing.T) {
 
 	// Construct a new Node instance and configure
 	// Andrej as a miner
-	n := NewNode("testAlias", datadir, nInfo.IP, nInfo.Port, state.NewAddress("test"), "", nInfo)
+	n := NewNode("testAlias", datadir, nInfo.IP, nInfo.Port, state.NewAddress("test"), nInfo)
 
 	// Allow the mining to run for 30 mins, in the worst case
 	ctx, closeNode := context.WithTimeout(

@@ -14,7 +14,9 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 )
 
-func getKeystoreDirPath(datadir string) string {
+//
+
+func GetKeystoreDirPath(datadir string) string {
 	return filepath.Join(datadir, "keystore")
 }
 
@@ -34,7 +36,7 @@ func getBlocksDbFilePath(datadir string, isTemp bool) string {
 }
 
 func GetEncryptionKeysFilePath(datadir string) string {
-	return filepath.Join(getKeystoreDirPath(datadir), "keys.json")
+	return filepath.Join(GetKeystoreDirPath(datadir), "keys.json")
 }
 
 func initDataDirIfNotExists(dataDir string) error {

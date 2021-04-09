@@ -34,8 +34,7 @@ type Node struct {
 }
 
 func NewNode(name string, datadir string, ip string, port uint64,
-	address common.Address, encryptionPublicKey string,
-	bootstrap com.PeerNode) *Node {
+	address common.Address, bootstrap com.PeerNode) *Node {
 	knownPeers := make(map[string]com.PeerNode)
 	knownPeers[bootstrap.TcpAddress()] = bootstrap
 	return &Node{

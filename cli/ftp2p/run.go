@@ -6,7 +6,6 @@ import (
 	"ftp2p/common"
 	"ftp2p/node"
 	"ftp2p/state"
-	"ftp2p/wallet"
 	"math/rand"
 	"os"
 
@@ -27,7 +26,8 @@ func runCmd() *cobra.Command {
 			bootstrapIP, _ := cmd.Flags().GetString(flagBootstrapIP)
 			bootstrapPort, _ := cmd.Flags().GetUint64(flagBootstrapPort)
 
-			password := getPassPhrase("Password: ", false)
+			// TODO
+			// password := getPassPhrase("Password: ", false)
 
 			fmt.Println("")
 			fmt.Println("")
@@ -49,20 +49,12 @@ func runCmd() *cobra.Command {
 				bootstrapIP,
 				bootstrapPort,
 				true,
-				state.NewAddress(""), // 0x96131b31b9935f6388502b502cf544c1a8c65ad6
+				state.NewAddress(""),
 				false,
 			)
-			// decrypt encryption public key
-			keys, err := wallet.LoadEncryptionKeys(getDataDirFromCmd(cmd), password)
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
-			publicKey := keys[:32]
 			n := node.NewNode(name, getDataDirFromCmd(cmd), ip, port,
-				state.NewAddress(miner), string(publicKey),
-				bootstrap)
-			err = n.Run(context.Background())
+				state.NewAddress(miner), bootstrap)
+			err := n.Run(context.Background())
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)

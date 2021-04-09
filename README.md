@@ -1,10 +1,15 @@
 # FTP2P
-FTP2P is a blockchain for sharing [CID's](https://docs.ipfs.io/concepts/content-addressing/) with peers across ipfs gateways.
+FTP2P is a blockchain that acts as a decentralized, event-driven database.
+
+## Motivation
+The origin of this project stems from the question:
+`How can you safely store data in a public IPFS gateway and how can you safely share the content with others?`
+
+The resulting solution is FTP2P, a blockchain that acts as a decentralized, event-driven database. Unlike a blockchain like bitcoin where transactions ultimately represent an exchange of some amount of bitcoin, transactions within FTP2P represent a state mutation (as represented by a transaction type and an associated payload corresponding to a slice of the node state) published by a node. Transactions in this context only  require that a single node be available, and the mined blocks can be thought of as a global, append-only event log. Event sourcing allows  the *complete* state of the application to be rebuilt or recovered from any state/time, while the usage of a blockchain provides immutability to the stored events.
+
+By configuring transaction types, associated schemas, and implementing appropriate behavior for handling state updates as a result of transactions with a given type being mined, FTP2P can support nearly any use case. For example, see (TODO: ADD SOME EXAMPLE CONFIGS ONCE THIS IS BUILT OUT)
 
 ## Getting Started
-
-### Summary
-If you're familiar with pinning services (such as [this one](https://pinata.cloud/)) then you can best think of FTP2P as an inverted pinning service. FTP2P does not have any direct integration or dependency on IPFS.
 
 ### Pre requisites
 - install `go`
@@ -17,7 +22,7 @@ If you're familiar with pinning services (such as [this one](https://pinata.clou
 
 - (TODO) Install f2p2p using:
 ```
-go get github.com/driemworks/ftp2p/master
+go get github.com/driemworks/ftp2p/ftp2p
 ```
 
 ## Usage
@@ -61,7 +66,26 @@ See the [API documentation](https://github.com/driemworks/ftp2p/blob/master/docs
 
 
 ### Development
+
+The project is composed of the following packages:
+#### cli
+The `cli` package contains code and configs for the cli, as explained above.
+
+#### common
+Contains common structs and functions used across `cli`, `node`, `state`, and `wallet`
+
+#### node
+HTTP API
+
+#### state
+State management (used by the node). 
+- block, transactions, etc
+
+#### wallet
+Create and manage your keystore
+
 If you'd like to contribute send me an email at tonyrriemer@gmail.com or message me on discord: driemworks#1849
+
 
 ### Testing
 - example: $ go test ./node/ -test.v -test.run ^TestValidBlockHash$ 

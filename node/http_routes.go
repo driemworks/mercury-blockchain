@@ -68,14 +68,14 @@ type cidAddRequest struct {
 	FromPwd string `json:"from_pwd"`
 }
 
-type encryptDataRequest struct {
+type EncryptDataRequest struct {
 	Data    string `json:"data"` // doing this for now, change to multipart upload later?
 	To      string `json:"to"`
 	FromPwd string `json:"from_pwd"`
 }
 
 type EncryptDataResponse struct {
-	EncryptedData *wallet.EncryptedData `json:"encrypted_data"`
+	EncryptedData wallet.EncryptedData `json:"encrypted_data"`
 }
 
 type DecryptDataRequest struct {
