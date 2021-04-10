@@ -108,7 +108,11 @@ func (n *Node) syncBlocks(peer core.PeerNode, status StatusResponse) error {
 	}
 	// blocks, err := fetchBlocksFromPeer(peer, n.state.LatestBlock().Header.Parent)
 	// get blocks from the peer's latest block's parent
-	blockHash := n.state.LatestBlock().Header.Parent
+	blockHash := n.state.LatestBlockHash()
+	// TODO - should really fetch from the latest block's parent. This is to account for the scenario where multiple nodes mine the same block
+	// before they can sync
+
+	// blockHash := n.state.LatestBlock().Header.Parent
 	// retrieve all blocks after the parent block
 	blocks, err := fetchBlocksFromPeer(peer, blockHash)
 	if err != nil {

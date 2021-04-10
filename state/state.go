@@ -14,7 +14,7 @@ import (
 	"github.com/raphamorim/go-rainbow"
 )
 
-const BlockReward = float32(100)
+const BlockReward = float32(10)
 
 // TODO used as both a request and response... maybe move to common?
 type CID struct {
@@ -137,7 +137,7 @@ func (s *State) AddBlock(b Block) (*State, Hash, error) {
 				// return s, Hash{}, fmt.Errorf("ORPHAN BLOCK ENCOUNTERED")
 			} else {
 				// your block wins... stop mining from this peer
-				fmt.Println("congrats.. your block wins (greater PoW)")
+				// fmt.Println("congrats.. your block wins (greater PoW)")
 				return nil, Hash{}, nil
 			}
 		}
@@ -321,6 +321,7 @@ func applyTx(tx SignedTx, s *State) error {
 	}
 	// could ignore transactions that aren't mine?
 	payload := tx.Payload
+	// the below will update the state based on the transaction type
 	if tx.Type == TX_TYPE_001 {
 		// map the payload to a CID
 		var cid CID
@@ -340,13 +341,11 @@ func applyTx(tx SignedTx, s *State) error {
 		// update recipient inbox items
 		var receipientMailbox = s.Manifest[tx.To]
 		receipientMailbox.Balance += tx.Amount
-		// add a new inbox item if there is a CID
-		if !cid.IsEmpty() {
-			receipientMailbox.Inbox = append(receipientMailbox.Inbox, InboxItem{tx.From, cid, txHash, tx.Amount})
-		}
+		receipientMailbox.Inbox = append(receipientMailbox.Inbox, InboxItem{tx.From, cid, txHash, tx.Amount})
 		s.Manifest[tx.To] = receipientMailbox
-		s.Account2Nonce[tx.From] = tx.Nonce
+		// s.Account2Nonce[tx.From] = tx.Nonce
 	} else if tx.Type == TX_TYPE_002 {
+		fmt.Println("Adding trusted peer from transaction")
 		var peerNode core.PeerNode
 		switch t := payload.Value.(type) {
 		case map[string]interface{}:
@@ -359,13 +358,16 @@ func applyTx(tx SignedTx, s *State) error {
 				name, ip, port, isBootstrap, address, true,
 			)
 		default:
-			peerNode = tx.Payload.Value.(core.PeerNode)
+			payload := tx.Payload.Value.(TrustPeerTransactionPayload)
+			peerNode = core.NewPeerNode(
+				payload.Name, payload.IP, payload.Port, payload.IsBootstrap, payload.Address, true,
+			)
 		}
 		trustedPeersClone := s.Manifest[tx.From]
 		trustedPeersClone.TrustedPeers = append(s.Manifest[tx.From].TrustedPeers, peerNode)
 		s.Manifest[tx.From] = trustedPeersClone
-		fmt.Println("Adding trusted peer from transaction")
 	}
+	s.Account2Nonce[tx.From] = tx.Nonce
 	return nil
 }
 
