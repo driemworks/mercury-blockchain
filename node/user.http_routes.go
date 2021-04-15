@@ -132,15 +132,15 @@ func trustedPeersHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 }
 
 func sendCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
+	setupResponse(&w, r)
+	if (*r).Method == "OPTIONS" {
+		return
+	}
 	req := cidAddRequest{}
 	err := readReq(r, &req)
 	if err != nil {
+		fmt.Println(err)
 		writeErrRes(w, err)
-		return
-	}
-	setupResponse(&w, r)
-	// needed?
-	if (*r).Method == "OPTIONS" {
 		return
 	}
 	// safe to assume 'from' is a valid address
@@ -169,7 +169,7 @@ func sendCIDHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	// TODO - the cost to send a cid is always 1?
 	// should this really go to the tx's to value, or to the 'system' (bootstrap) node?
 	tx := state.NewTx(from, state.NewAddress(req.To),
-		state.TransactionPayload{state.NewCID(req.Cid, req.Gateway)}, nonce, 0, state.TX_TYPE_001)
+		state.TransactionPayload{state.NewCID(req.Cid, req.Gateway, req.Name)}, nonce, 0, state.TX_TYPE_001)
 	signedTx, err := wallet.SignTxWithKeystoreAccount(
 		tx, node.info.Address, req.FromPwd, wallet.GetKeystoreDirPath(node.datadir))
 	if err != nil {
@@ -238,7 +238,7 @@ func sendTokensHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	from := node.info.Address
 	nonce := node.state.PendingAccount2Nonce[node.info.Address] + 1
 	tx := state.NewTx(from, state.NewAddress(req.To),
-		state.TransactionPayload{state.NewCID("", "")}, nonce,
+		state.TransactionPayload{state.NewCID("", "", "")}, nonce,
 		float32(req.Amount), state.TX_TYPE_001)
 	signedTx, err := wallet.SignTxWithKeystoreAccount(tx, from, req.FromPwd,
 		wallet.GetKeystoreDirPath(node.datadir))

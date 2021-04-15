@@ -20,6 +20,7 @@ const BlockReward = float32(10)
 type CID struct {
 	CID         string `json:"cid"`
 	IPFSGateway string `json:"ipfs_gateway"`
+	Name        string `json:"name"`
 }
 
 type SentItem struct {
@@ -330,7 +331,8 @@ func applyTx(tx SignedTx, s *State) error {
 		case map[string]interface{}:
 			cid_string := fmt.Sprintf("%v", t["cid"])
 			gateway_string := fmt.Sprintf("%v", t["ipfs_gateway"])
-			cid = NewCID(cid_string, gateway_string)
+			name_string := fmt.Sprintf("%v", t["name"])
+			cid = NewCID(cid_string, gateway_string, name_string)
 		default:
 			cid = payload.Value.(CID)
 		}
@@ -375,8 +377,8 @@ func (c *CID) IsEmpty() bool {
 	return len(c.CID) == 0
 }
 
-func NewCID(cid string, gateway string) CID {
-	return CID{cid, gateway}
+func NewCID(cid string, gateway string, name string) CID {
+	return CID{cid, gateway, name}
 }
 
 /*

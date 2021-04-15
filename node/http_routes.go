@@ -63,6 +63,7 @@ type userMailboxResponse struct {
 
 type cidAddRequest struct {
 	To      string `json:"to"`
+	Name    string `json:"name"`
 	Cid     string `json:"cid"`
 	Gateway string `json:"gateway"`
 	FromPwd string `json:"from_pwd"`

@@ -64,7 +64,7 @@ func TestNode_Mining(t *testing.T) {
 	go func() {
 		time.Sleep(time.Second * miningIntervalSeconds / 3)
 		tx := state.SignedTx{state.NewTx(state.NewAddress("tony"), state.NewAddress("tonay"),
-			state.TransactionPayload{state.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", "ipfs.io")},
+			state.TransactionPayload{state.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", "ipfs.io", "")},
 			10, 0, state.TX_TYPE_001), []byte{}}
 
 		_ = n.AddPendingTX(tx)
@@ -75,7 +75,7 @@ func TestNode_Mining(t *testing.T) {
 	go func() {
 		time.Sleep(time.Second*miningIntervalSeconds + 2)
 		tx := state.SignedTx{state.NewTx(state.NewAddress("tony"), state.NewAddress("theo"),
-			state.TransactionPayload{state.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", "ipfs.io")}, 10, 0, state.TX_TYPE_001), []byte{}}
+			state.TransactionPayload{state.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", "ipfs.io", "")}, 10, 0, state.TX_TYPE_001), []byte{}}
 
 		_ = n.AddPendingTX(tx)
 	}()

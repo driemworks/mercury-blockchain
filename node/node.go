@@ -66,14 +66,12 @@ func (n *Node) Run(ctx context.Context) error {
 	n.state = state
 	go n.sync(ctx)
 	go n.mine(ctx)
-	/*
-		APPEND OPERATIONS
-	*/
-	http.HandleFunc("/publish", func(w http.ResponseWriter, r *http.Request) {
+	// publish a new CID
+	http.HandleFunc("/cid", func(w http.ResponseWriter, r *http.Request) {
 		sendCIDHandler(w, r, n)
 	})
 	// add a PeerNode to the trusted peers slice
-	http.HandleFunc("/peers/trusted/add", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/trusted-peer", func(w http.ResponseWriter, r *http.Request) {
 		addTrustedPeerNodeHandler(w, r, n)
 	})
 	/*
@@ -90,7 +88,7 @@ func (n *Node) Run(ctx context.Context) error {
 	/*
 		READ OPERATIONS
 	*/
-	http.HandleFunc("/inbox", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/received", func(w http.ResponseWriter, r *http.Request) {
 		inboxHandler(w, r, n)
 	})
 	http.HandleFunc("/sent", func(w http.ResponseWriter, r *http.Request) {
