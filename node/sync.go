@@ -48,11 +48,22 @@ func (n *Node) doSync() {
 		if err != nil {
 			fmt.Printf("ERROR: %s\n", err)
 			fmt.Printf("Peer '%s' was removed from KnownPeers\n", rainbow.Bold(rainbow.Green(peer.TcpAddress())))
-
 			n.RemovePeer(peer)
-
 			continue
 		}
+
+		// sync peer name and address
+		info, err := queryPeerInfo(peer)
+		if err != nil {
+			fmt.Printf("ERROR: %s\n", err)
+			fmt.Printf("Peer '%s' was removed from KnownPeers\n", rainbow.Bold(rainbow.Green(peer.TcpAddress())))
+			n.RemovePeer(peer)
+			continue
+		}
+		// update name and address and add back to known peers
+		peer.Name = info.Name
+		peer.Address = state.NewAddress(info.Address)
+		n.knownPeers[peer.TcpAddress()] = peer
 
 		err = n.joinKnownPeers(peer)
 		if err != nil {
@@ -211,6 +222,22 @@ func queryPeerStatus(peer core.PeerNode) (StatusResponse, error) {
 	}
 
 	return StatusResponse, nil
+}
+
+func queryPeerInfo(peer core.PeerNode) (ListInfoResponse, error) {
+	url := fmt.Sprintf("http://%s%s", peer.TcpAddress(), "/info")
+	res, err := http.Get(url)
+	if err != nil {
+		return ListInfoResponse{}, err
+	}
+
+	listInfoResponse := ListInfoResponse{}
+	err = readRes(res, &listInfoResponse)
+	if err != nil {
+		return ListInfoResponse{}, err
+	}
+
+	return listInfoResponse, nil
 }
 
 func fetchBlocksFromPeer(peer core.PeerNode, fromBlock state.Hash) ([]state.Block, error) {

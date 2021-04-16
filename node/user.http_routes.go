@@ -21,7 +21,7 @@ type listSentResponse struct {
 	Sent []state.SentItem `json:"sent"`
 }
 
-type listInfoResponse struct {
+type ListInfoResponse struct {
 	Address string  `json:"address"`
 	Name    string  `json:"name"`
 	Balance float32 `json:"balance"`
@@ -107,7 +107,7 @@ func sentHandler(w http.ResponseWriter, r *http.Request, node *Node) {
  */
 func infoHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	from := node.info.Address
-	writeRes(w, listInfoResponse{from.Hex(), node.name,
+	writeRes(w, ListInfoResponse{from.Hex(), node.name,
 		node.state.Manifest[from].Balance})
 }
 
@@ -191,7 +191,8 @@ func addTrustedPeerNodeHandler(w http.ResponseWriter, r *http.Request, node *Nod
 		writeErrRes(w, err)
 		return
 	}
-	if node.knownPeers[req.TcpAddress].Address == state.NewAddress("0x0000000000000000000000000000000000000000") {
+	pn := node.knownPeers[req.TcpAddress]
+	if !pn.IsBootstrap && pn.Address == state.NewAddress("0x0000000000000000000000000000000000000000") {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("{\"error_code\": \"ERR_001\", \"error_desc\": \"no known node with provided address\"}"))
