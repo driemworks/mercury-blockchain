@@ -20,9 +20,9 @@ By configuring transaction types, associated schemas, and implementing appropria
 - Install mercury from the source by cloning this repo and run `go install ./cli/...` from the root directory `mercury-blockchain/`.
 
 
-- (TODO) Install f2p2p using:
+- Install the latest version using:
 ```
-go get github.com/driemworks/mercury/
+go get github.com/driemworks/mercury-blockchain/cli/...
 ```
 
 ## Usage
