@@ -10,6 +10,8 @@ import (
 func writeErrRes(w http.ResponseWriter, err error) {
 	jsonErrRes, _ := json.Marshal(ErrorResponse{err.Error()})
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Method", "*")
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Write(jsonErrRes)
 }
@@ -22,9 +24,8 @@ func writeRes(w http.ResponseWriter, content interface{}) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("access-control-allow-origin", "*")
-	w.Header().Set("access-control-allow-method", "*")
-	// w.WriteHeader(http.StatusOK)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Method", "*")
 	w.Write(contentJson)
 }
 

@@ -2,8 +2,8 @@ package node
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
+	"ftp2p/core"
 	"ftp2p/state"
 	"net/http"
 	"time"
@@ -48,11 +48,22 @@ func (n *Node) doSync() {
 		if err != nil {
 			fmt.Printf("ERROR: %s\n", err)
 			fmt.Printf("Peer '%s' was removed from KnownPeers\n", rainbow.Bold(rainbow.Green(peer.TcpAddress())))
-
 			n.RemovePeer(peer)
-
 			continue
 		}
+
+		// sync peer name and address
+		info, err := queryPeerInfo(peer)
+		if err != nil {
+			fmt.Printf("ERROR: %s\n", err)
+			fmt.Printf("Peer '%s' was removed from KnownPeers\n", rainbow.Bold(rainbow.Green(peer.TcpAddress())))
+			n.RemovePeer(peer)
+			continue
+		}
+		// update name and address and add back to known peers
+		peer.Name = info.Name
+		peer.Address = state.NewAddress(info.Address)
+		n.knownPeers[peer.TcpAddress()] = peer
 
 		err = n.joinKnownPeers(peer)
 		if err != nil {
@@ -80,7 +91,7 @@ func (n *Node) doSync() {
 	}
 }
 
-func (n *Node) syncBlocks(peer PeerNode, status StatusResponse) error {
+func (n *Node) syncBlocks(peer core.PeerNode, status StatusResponse) error {
 	localBlockNumber := n.state.LatestBlock().Header.Number
 	// If the peer has no blocks, ignore it
 	if status.Hash.IsEmpty() {
@@ -108,7 +119,11 @@ func (n *Node) syncBlocks(peer PeerNode, status StatusResponse) error {
 	}
 	// blocks, err := fetchBlocksFromPeer(peer, n.state.LatestBlock().Header.Parent)
 	// get blocks from the peer's latest block's parent
-	blockHash := n.state.LatestBlock().Header.Parent
+	blockHash := n.state.LatestBlockHash()
+	// TODO - should really fetch from the latest block's parent. This is to account for the scenario where multiple nodes mine the same block
+	// before they can sync
+
+	// blockHash := n.state.LatestBlock().Header.Parent
 	// retrieve all blocks after the parent block
 	blocks, err := fetchBlocksFromPeer(peer, blockHash)
 	if err != nil {
@@ -152,20 +167,19 @@ func (n *Node) syncPendingTXs(txs []state.SignedTx) error {
 	return nil
 }
 
-func (n *Node) joinKnownPeers(peer PeerNode) error {
-	if peer.connected {
+func (n *Node) joinKnownPeers(peer core.PeerNode) error {
+	if peer.Connected {
 		return nil
 	}
 
 	url := fmt.Sprintf(
-		"http://%s%s?%s=%s&%s=%d&%s=%s&%s=%s&%s=%s",
+		"http://%s%s?%s=%s&%s=%d&%s=%s&%s=%s",
 		peer.TcpAddress(),
 		endpointAddPeer,
 		endpointAddPeerQueryKeyIP, n.info.IP,
 		endpointAddPeerQueryKeyPort, n.info.Port,
 		endpointAddPeerQueryKeyMiner, n.info.Address,
 		endpointAddNameQueryKeyName, n.info.Name,
-		"publicKey", base64.StdEncoding.EncodeToString([]byte(n.info.EncryptionPublicKey)),
 	)
 
 	res, err := http.Get(url)
@@ -183,7 +197,7 @@ func (n *Node) joinKnownPeers(peer PeerNode) error {
 	}
 
 	knownPeer := n.knownPeers[peer.TcpAddress()]
-	knownPeer.connected = addPeerRes.Success
+	knownPeer.Connected = addPeerRes.Success
 
 	n.AddPeer(knownPeer)
 
@@ -194,7 +208,7 @@ func (n *Node) joinKnownPeers(peer PeerNode) error {
 	return nil
 }
 
-func queryPeerStatus(peer PeerNode) (StatusResponse, error) {
+func queryPeerStatus(peer core.PeerNode) (StatusResponse, error) {
 	url := fmt.Sprintf("http://%s%s", peer.TcpAddress(), endpointStatus)
 	res, err := http.Get(url)
 	if err != nil {
@@ -210,7 +224,23 @@ func queryPeerStatus(peer PeerNode) (StatusResponse, error) {
 	return StatusResponse, nil
 }
 
-func fetchBlocksFromPeer(peer PeerNode, fromBlock state.Hash) ([]state.Block, error) {
+func queryPeerInfo(peer core.PeerNode) (ListInfoResponse, error) {
+	url := fmt.Sprintf("http://%s%s", peer.TcpAddress(), "/info")
+	res, err := http.Get(url)
+	if err != nil {
+		return ListInfoResponse{}, err
+	}
+
+	listInfoResponse := ListInfoResponse{}
+	err = readRes(res, &listInfoResponse)
+	if err != nil {
+		return ListInfoResponse{}, err
+	}
+
+	return listInfoResponse, nil
+}
+
+func fetchBlocksFromPeer(peer core.PeerNode, fromBlock state.Hash) ([]state.Block, error) {
 	fmt.Printf("Importing blocks from Peer %s...\n", rainbow.Bold(rainbow.Green(peer.TcpAddress())))
 
 	url := fmt.Sprintf(

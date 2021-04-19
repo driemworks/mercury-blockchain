@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"ftp2p/core"
 	"ftp2p/state"
 	"os"
 	"path/filepath"
@@ -18,8 +19,8 @@ func TestNode_Run(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	n := NewNode("testAlias", datadir, "127.0.0.1", 8085, state.NewAddress("test"), "", NewPeerNode(
-		"", "127.0.0.1", 8080, false, common.Address{}, "", true,
+	n := NewNode("testAlias", datadir, "127.0.0.1", 8085, state.NewAddress("test"), core.NewPeerNode(
+		"", "127.0.0.1", 8080, false, common.Address{}, true,
 	))
 
 	ctx, _ := context.WithTimeout(context.Background(), time.Second*5)
@@ -39,19 +40,18 @@ func TestNode_Mining(t *testing.T) {
 
 	// Required for AddPendingTX() to describe
 	// from what node the TX came from (local node in this case)
-	nInfo := NewPeerNode(
+	nInfo := core.NewPeerNode(
 		"test",
 		"127.0.0.1",
 		8085,
 		false,
 		state.NewAddress("0x9F0d31dFE801cc74ED9e50F06aDC7B168FF2F35b"),
-		"",
 		true,
 	)
 
 	// Construct a new Node instance and configure
 	// Andrej as a miner
-	n := NewNode("testAlias", datadir, nInfo.IP, nInfo.Port, state.NewAddress("test"), "", nInfo)
+	n := NewNode("testAlias", datadir, nInfo.IP, nInfo.Port, state.NewAddress("test"), nInfo)
 
 	// Allow the mining to run for 30 mins, in the worst case
 	ctx, closeNode := context.WithTimeout(
@@ -61,21 +61,24 @@ func TestNode_Mining(t *testing.T) {
 
 	// Schedule a new TX in 3 seconds from now, in a separate thread
 	// because the n.Run() few lines below is a blocking call
-	// go func() {
-	// 	time.Sleep(time.Second * miningIntervalSeconds / 3)
-	// 	tx := manifest.SignedTx{manifest.NewTx(manifest.NewAddress("tony"), manifest.NewAddress("tonya"), manifest.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH"), 10, 0), []byte{}}
+	go func() {
+		time.Sleep(time.Second * miningIntervalSeconds / 3)
+		tx := state.SignedTx{state.NewTx(state.NewAddress("tony"), state.NewAddress("tonay"),
+			state.TransactionPayload{state.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", "ipfs.io", "")},
+			10, 0, state.TX_TYPE_001), []byte{}}
 
-	// 	_ = n.AddPendingTX(tx, nInfo)
-	// }()
+		_ = n.AddPendingTX(tx)
+	}()
 
 	// Schedule a new TX in 12 seconds from now simulating
 	// that it came in - while the first TX is being mined
-	// go func() {
-	// 	time.Sleep(time.Second*miningIntervalSeconds + 2)
-	// 	tx := manifest.SignedTx{manifest.NewTx(manifest.NewAddress("tony"), manifest.NewAddress("theo"), manifest.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH"), 10, 0), []byte{}}
+	go func() {
+		time.Sleep(time.Second*miningIntervalSeconds + 2)
+		tx := state.SignedTx{state.NewTx(state.NewAddress("tony"), state.NewAddress("theo"),
+			state.TransactionPayload{state.NewCID("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH", "ipfs.io", "")}, 10, 0, state.TX_TYPE_001), []byte{}}
 
-	// 	_ = n.AddPendingTX(tx, nInfo)
-	// }()
+		_ = n.AddPendingTX(tx)
+	}()
 
 	go func() {
 		// Periodically check if we mined the 2 blocks

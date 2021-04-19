@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	"ftp2p/core"
 	"ftp2p/state"
 	"ftp2p/wallet"
 	"net/http"
@@ -29,12 +30,12 @@ type ErrorResponse struct {
 
 // StatusResponse TODO
 type StatusResponse struct {
-	Hash         state.Hash          `json:"block_hash"`
-	Number       uint64              `json:"block_number"`
-	Alias        string              `json:"alias"`
-	KnownPeers   map[string]PeerNode `json:"known_peers"`
-	TrustedPeers map[string]PeerNode `json:"trusted_peers"`
-	PendingTxs   []state.SignedTx    `json:"pending_txs"`
+	Hash         state.Hash               `json:"block_hash"`
+	Number       uint64                   `json:"block_number"`
+	Alias        string                   `json:"alias"`
+	KnownPeers   map[string]core.PeerNode `json:"known_peers"`
+	TrustedPeers map[string]core.PeerNode `json:"trusted_peers"`
+	PendingTxs   []state.SignedTx         `json:"pending_txs"`
 }
 
 type TokenRequestResponse struct {
@@ -62,19 +63,20 @@ type userMailboxResponse struct {
 
 type cidAddRequest struct {
 	To      string `json:"to"`
+	Name    string `json:"name"`
 	Cid     string `json:"cid"`
 	Gateway string `json:"gateway"`
 	FromPwd string `json:"from_pwd"`
 }
 
-type encryptDataRequest struct {
+type EncryptDataRequest struct {
 	Data    string `json:"data"` // doing this for now, change to multipart upload later?
 	To      string `json:"to"`
 	FromPwd string `json:"from_pwd"`
 }
 
 type EncryptDataResponse struct {
-	EncryptedData *wallet.EncryptedData `json:"encrypted_data"`
+	EncryptedData wallet.EncryptedData `json:"encrypted_data"`
 }
 
 type DecryptDataRequest struct {
@@ -135,14 +137,13 @@ func addPeerHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 	peerPortRaw := r.URL.Query().Get("port")
 	peerName := r.URL.Query().Get("name")
 	minerRaw := r.URL.Query().Get("miner")
-	encryptionPublicKey := r.URL.Query().Get("publicKey")
 
 	peerPort, err := strconv.ParseUint(peerPortRaw, 10, 32)
 	if err != nil {
 		writeRes(w, AddPeerRes{false, err.Error()})
 		return
 	}
-	peer := NewPeerNode(peerName, peerIP, peerPort, false, state.NewAddress(minerRaw), encryptionPublicKey, true)
+	peer := core.NewPeerNode(peerName, peerIP, peerPort, false, state.NewAddress(minerRaw), true)
 	node.AddPeer(peer)
 	fmt.Printf("Peer "+rainbow.Green("'%s'")+" was added into KnownPeers\n", peer.TcpAddress())
 	writeRes(w, AddPeerRes{true, ""})

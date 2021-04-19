@@ -2,19 +2,21 @@ package node
 
 import (
 	"fmt"
+	"ftp2p/core"
+	"ftp2p/state"
 	"ftp2p/wallet"
 	"net/http"
 )
 
 func encryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
-	req := encryptDataRequest{}
+	req := EncryptDataRequest{}
 	err := readReq(r, &req)
 	if err != nil {
 		writeErrRes(w, err)
 		return
 	}
 	// if req.To not provided, peer node is yourself
-	var trustedPeerNode PeerNode
+	var trustedPeerNode core.PeerNode
 	if req.To == "" {
 		trustedPeerNode = node.info
 	} else {
@@ -24,35 +26,22 @@ func encryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 			}
 		}
 	}
-
-	var recipientKey [32]byte
-	copy(recipientKey[:], []byte(trustedPeerNode.EncryptionPublicKey))
 	if trustedPeerNode.IP == "" {
 		writeErrRes(w, fmt.Errorf("node with address %s is not a trusted peer", req.To))
+	} else {
+		var receiverPublicKey [32]byte
+		copy(receiverPublicKey[:], trustedPeerNode.Address.Hash().Bytes())
+		encryptedData, err := wallet.Encrypt(
+			receiverPublicKey,
+			[]byte(req.Data),
+			wallet.X25519,
+		)
+		if err != nil {
+			writeErrRes(w, err)
+			return
+		}
+		writeRes(w, EncryptDataResponse{EncryptedData: *encryptedData})
 	}
-	keys, err := wallet.LoadEncryptionKeys(node.datadir, req.FromPwd)
-	var publicKey [32]byte
-	copy(publicKey[:], keys[:32])
-
-	var privateKey [32]byte
-	copy(privateKey[:], keys[32:])
-
-	if err != nil {
-		writeErrRes(w, err)
-		return
-	}
-	encryptedData, err := wallet.Encrypt(
-		publicKey,
-		privateKey,
-		recipientKey,
-		[]byte(req.Data),
-		wallet.X25519,
-	)
-	if err != nil {
-		writeErrRes(w, err)
-		return
-	}
-	writeRes(w, EncryptDataResponse{EncryptedData: encryptedData})
 }
 
 func decryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
@@ -62,17 +51,11 @@ func decryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {
 		writeErrRes(w, err)
 		return
 	}
-	keys, err := wallet.LoadEncryptionKeys(node.datadir, req.FromPwd)
-	if err != nil {
-		writeErrRes(w, err)
-		return
-	}
-	_privateKey := [32]byte{}
-	copy(_privateKey[:], keys[32:])
-
+	fmt.Println(req.EncryptedData)
 	decryptedData, err := wallet.Decrypt(
-		_privateKey,
-		&req.EncryptedData,
+		req.FromPwd,
+		state.GetKeystoreDirPath(node.datadir),
+		req.EncryptedData,
 	)
 	if err != nil {
 		writeErrRes(w, err)

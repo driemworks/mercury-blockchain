@@ -4,24 +4,50 @@ import (
 	"crypto/elliptic"
 	"crypto/sha256"
 	"encoding/json"
+	"ftp2p/core"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+// these constants directly correlate to user actions
+const (
+	TX_TYPE_001 = "PUBLISH"    // publish a cid to the network
+	TX_TYPE_002 = "TRUST_PEER" // add a peer to the trusted peers
+)
+
 func NewAddress(value string) common.Address {
 	return common.HexToAddress(value)
 }
 
-// TODO - need to generalize
 type Tx struct {
-	From   common.Address `json:"from"`
-	To     common.Address `json:"to"`
-	CID    CID            `json:"cid"`
-	Nonce  uint           `json:"nonce"`
-	Time   uint64         `json:"time"`
-	Amount float32        `json:"amount"`
+	From    common.Address     `json:"from"`
+	To      common.Address     `json:"to"`
+	Payload TransactionPayload `json:"payload"`
+	Nonce   uint               `json:"nonce"`
+	Time    uint64             `json:"time"`
+	Amount  float32            `json:"amount"`
+	Type    string             `json:"type"`
+}
+
+type TransactionPayload struct {
+	Value interface{}
+}
+
+func NewTrustPeerTransactionPayload(pn core.PeerNode) TrustPeerTransactionPayload {
+	return TrustPeerTransactionPayload{
+		pn.Address, pn.IP, pn.IsBootstrap, pn.Name, pn.Port,
+	}
+}
+
+// everything in PeerNode except the Connected field
+type TrustPeerTransactionPayload struct {
+	Address     common.Address `json:"address"`
+	IP          string         `json:"ip"`
+	IsBootstrap bool           `json:"is_bootstrap"`
+	Name        string         `json:"name"`
+	Port        uint64         `json:"port"`
 }
 
 type SignedTx struct {
@@ -29,8 +55,8 @@ type SignedTx struct {
 	Sig []byte `json:"signature"`
 }
 
-func NewTx(from common.Address, to common.Address, cid CID, nonce uint, amount float32) Tx {
-	return Tx{from, to, cid, nonce, uint64(time.Now().Unix()), amount}
+func NewTx(from common.Address, to common.Address, payload TransactionPayload, nonce uint, amount float32, txType string) Tx {
+	return Tx{from, to, payload, nonce, uint64(time.Now().Unix()), amount, txType}
 }
 
 func NewSignedTx(tx Tx, sig []byte) SignedTx {
