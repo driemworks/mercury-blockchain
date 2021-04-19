@@ -3,10 +3,11 @@ package node
 import (
 	"context"
 	"fmt"
-	"ftp2p/core"
-	"ftp2p/state"
 	"net/http"
 	"time"
+
+	"github.com/driemworks/mercury-blockchain/core"
+	"github.com/driemworks/mercury-blockchain/state"
 
 	"github.com/raphamorim/go-rainbow"
 )

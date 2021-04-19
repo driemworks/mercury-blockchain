@@ -7,7 +7,7 @@ import (
 )
 
 func Test_loadGenesis_Success(t *testing.T) {
-	filepath := "../test/.ftp2p/genesis.json"
+	filepath := "../test/.mercury/genesis.json"
 	genesis, err := loadGenesis(filepath)
 	assert.Nil(t, err)
 	assert.NotNil(t, genesis)

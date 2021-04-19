@@ -2,10 +2,11 @@ package node
 
 import (
 	"fmt"
-	"ftp2p/core"
-	"ftp2p/state"
-	"ftp2p/wallet"
 	"net/http"
+
+	"github.com/driemworks/mercury-blockchain/core"
+	"github.com/driemworks/mercury-blockchain/state"
+	"github.com/driemworks/mercury-blockchain/wallet"
 )
 
 func encryptDataHandler(w http.ResponseWriter, r *http.Request, node *Node) {

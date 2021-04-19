@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"ftp2p/core"
 	"os"
 	"reflect"
 	"sort"
 	"strconv"
+
+	"github.com/driemworks/mercury-blockchain/core"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/raphamorim/go-rainbow"

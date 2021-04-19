@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"ftp2p/state"
 	"os"
+
+	"github.com/driemworks/mercury-blockchain/state"
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/spf13/cobra"
@@ -19,18 +20,18 @@ const flagBootstrapIP = "bootstrap-ip"
 const flagBootstrapPort = "bootstrap-port"
 
 func main() {
-	var ftp2pCmd = &cobra.Command{
-		Use:   "ftp2p",
-		Short: "ftp2p cli",
+	var mainCmd = &cobra.Command{
+		Use:   "mercury",
+		Short: "mercury cli",
 		Run: func(cmd *cobra.Command, args []string) {
 		},
 	}
 	// TODO these need to be standardized...
-	ftp2pCmd.AddCommand(versionCmd)
-	ftp2pCmd.AddCommand(runCmd())
-	ftp2pCmd.AddCommand(walletCmd())
+	mainCmd.AddCommand(versionCmd)
+	mainCmd.AddCommand(runCmd())
+	mainCmd.AddCommand(walletCmd())
 
-	err := ftp2pCmd.Execute()
+	err := mainCmd.Execute()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

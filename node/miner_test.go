@@ -3,9 +3,10 @@ package node
 import (
 	"context"
 	"encoding/hex"
-	"ftp2p/state"
 	"testing"
 	"time"
+
+	"github.com/driemworks/mercury-blockchain/state"
 
 	"github.com/ethereum/go-ethereum/common"
 )

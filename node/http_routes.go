@@ -2,11 +2,12 @@ package node
 
 import (
 	"fmt"
-	"ftp2p/core"
-	"ftp2p/state"
-	"ftp2p/wallet"
 	"net/http"
 	"strconv"
+
+	"github.com/driemworks/mercury-blockchain/core"
+	"github.com/driemworks/mercury-blockchain/state"
+	"github.com/driemworks/mercury-blockchain/wallet"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/raphamorim/go-rainbow"

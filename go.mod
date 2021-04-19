@@ -1,4 +1,4 @@
-module ftp2p
+module github.com/driemworks/mercury-blockchain
 
 go 1.15
 

@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"ftp2p/wallet"
 	"io/ioutil"
 	"os"
+
+	"github.com/driemworks/mercury-blockchain/wallet"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/accounts/keystore"

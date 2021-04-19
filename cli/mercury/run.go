@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"ftp2p/core"
-	"ftp2p/node"
-	"ftp2p/state"
 	"math/rand"
 	"os"
+
+	"github.com/driemworks/mercury-blockchain/core"
+	"github.com/driemworks/mercury-blockchain/node"
+	"github.com/driemworks/mercury-blockchain/state"
 
 	"github.com/raphamorim/go-rainbow"
 	"github.com/spf13/cobra"
@@ -16,7 +17,7 @@ import (
 func runCmd() *cobra.Command {
 	var runCmd = &cobra.Command{
 		Use:   "run",
-		Short: "Run the ftp2p node",
+		Short: "Run the mercury node",
 		Run: func(cmd *cobra.Command, args []string) {
 
 			name, _ := cmd.Flags().GetString(flagName)

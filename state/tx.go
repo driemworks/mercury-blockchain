@@ -4,8 +4,9 @@ import (
 	"crypto/elliptic"
 	"crypto/sha256"
 	"encoding/json"
-	"ftp2p/core"
 	"time"
+
+	"github.com/driemworks/mercury-blockchain/core"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"

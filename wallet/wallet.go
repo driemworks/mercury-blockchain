@@ -7,10 +7,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"ftp2p/state"
 	"io"
 	"io/ioutil"
 	"path/filepath"
+
+	"github.com/driemworks/mercury-blockchain/state"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"

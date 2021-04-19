@@ -5,10 +5,11 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
-	"ftp2p/state"
 	"io/ioutil"
 	"math/big"
 	"testing"
+
+	"github.com/driemworks/mercury-blockchain/state"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"

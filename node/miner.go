@@ -3,9 +3,10 @@ package node
 import (
 	"context"
 	"fmt"
-	"ftp2p/state"
 	"math/rand"
 	"time"
+
+	"github.com/driemworks/mercury-blockchain/state"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/raphamorim/go-rainbow"

@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"ftp2p/core"
-	"ftp2p/state"
 	"net/http"
 	"time"
+
+	"github.com/driemworks/mercury-blockchain/core"
+	"github.com/driemworks/mercury-blockchain/state"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/raphamorim/go-rainbow"

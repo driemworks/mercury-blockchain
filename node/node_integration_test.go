@@ -2,12 +2,13 @@ package node
 
 import (
 	"context"
-	"ftp2p/core"
-	"ftp2p/state"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/driemworks/mercury-blockchain/core"
+	"github.com/driemworks/mercury-blockchain/state"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -252,5 +253,5 @@ func TestNode_Mining(t *testing.T) {
 // }
 
 func getTestDataDirPath() string {
-	return filepath.Join(os.TempDir(), ".ftp2p2_test")
+	return filepath.Join(os.TempDir(), ".mercury")
 }
