@@ -55,13 +55,17 @@ Note: if you're running linux you may need to set `export GO111MODULE=on`
   mercury run --datadir=./.mercury --name=Theo --miner=0x27084384033F90d96c3769e1b4fCE0E5ffff720B --port=8080 --bootstrap-ip=127.0.0.1 --bootstrap-port=8081
   ```
 
-Note: This will only work if you have a publically exposed host.
-To connect with the test network, use `--bootstrap-ip=ec2-34-207-242-13.compute-1.amazonaws.com` and `bootstrap-port=8080`
-`mercury run --name=theo --datadir=.mercury/ --miner=0x990DB19D440124F3d5bA8867b3C35bC0D3c5Eda8 --ip=<your publicly exposed ip or dns address> --port=<your port> --bootstrap-ip=ec2-34-207-242-13.compute-1.amazonaws.com --bootstrap-port=8080`
+### UI 
 There is a crude ui available to interact with your node. Run an ipfs node with `ipfs daemon` and navigate to `http://127.0.0.1:8080/ipfs/Qmc55mmfkrmTyhRRYsaU9d3sDUBbMPXrtExnrwVbuESEAY/build/`
 
 
 Note: The ui is available via pinata, however, due to the crudeness of the UI it requires a local ipfs node to be running in order to be functional. https://gateway.pinata.cloud/ipfs/Qmc55mmfkrmTyhRRYsaU9d3sDUBbMPXrtExnrwVbuESEAY/build/
+
+### Connect to test network
+
+Note: The bootstrap node is not ready yet.
+To connect with the test network, use `--bootstrap-ip=ec2-34-207-242-13.compute-1.amazonaws.com` and `bootstrap-port=8080`
+`mercury run --name=theo --datadir=.mercury/ --miner=0x990DB19D440124F3d5bA8867b3C35bC0D3c5Eda8 --ip=<your publicly exposed ip or dns address> --port=<your port> --bootstrap-ip=ec2-34-207-242-13.compute-1.amazonaws.com --bootstrap-port=8080`
 
 // ec2 public ip: 34.207.242.13
 
@@ -70,11 +74,14 @@ Note: In order to use the API a node must be running.
 
 ### RPC
 Mercury uses gRPC as a transport layer between nodes.
+Authentication is pending.
+
+#### Get Node Info
 
 To interact with the RPC endpoints, I recommend using [grpcurl](https://github.com/fullstorydev/grpcurl).
 Then you can run:
 ```
-$ grpcurl 127.0.0.1:8081 proto.PublicNode/GetNodeStatus
+$ grpcurl -plaintext 127.0.0.1:8081 proto.PublicNode/GetNodeStatus
 {
   "address": "0xa7ED5257C26Ca5d8aF05FdE04919ce7d4a959147",
   "name": "tony",
@@ -83,26 +90,27 @@ $ grpcurl 127.0.0.1:8081 proto.PublicNode/GetNodeStatus
 ```
 Note: Pass the `-insecure` flag to grpcurl if you want to ignore any certificate issues.
 
+
+#### Publish content
 To add a new pending transaction (publish a CID)
 ```
-grpcurl -insecure 127.0.0.1:8081 proto.PublicNode/AddPendingPublishCIDTransaction <<EOM
+$ grpcurl -plaintext -d @ 127.0.0.1:8080 proto.PublicNode/AddPendingPublishCIDTransaction <<EOM
 {
-	"cid": "a",
-	"gateway": "b",
-	"toAddress": "c",
-	"name": "d"
+"cid": "a",
+"gateway": "b",
+"toAddress": "c",
+"name": "d"
 }
 EOM
-
 ```
 
-### Development
+## Development
 
 The project is composed of the following packages:
 #### cli
 The `cli` package contains code and configs for the cli, as explained above.
 
-#### common
+#### core
 Contains common structs and functions used across `cli`, `node`, `state`, and `wallet`
 
 #### node
@@ -114,8 +122,6 @@ State management (used by the node).
 
 #### wallet
 Create and manage your keystore
-
-If you'd like to contribute send me an email at tonyrriemer@gmail.com or message me on discord: driemworks#1849
 
 #### proto
 To update server interface, run:
@@ -131,6 +137,9 @@ protoc --go_out=. --go_opt=paths=source_relative \
 
 ### Testing
 - example: $ go test ./node/ -test.v -test.run ^TestValidBlockHash$ 
+
+## Contributing
+If you'd like to contribute send me an email at tonyrriemer@gmail.com or message me on discord: driemworks#1849
 
 ## Acknowledgements
 - This repository's basis is heavily influenced by this repo and the associated ebook https://github.com/web3coach/the-blockchain-bar
