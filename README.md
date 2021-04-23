@@ -66,16 +66,35 @@ Note: The ui is available via pinata, however, due to the crudeness of the UI it
 // ec2 public ip: 34.207.242.13
 
 ## API
-Note: In order to use the API a node must be running. 
+Note: In order to use the API a node must be running.
 
-See the [API documentation](https://github.com/driemworks/mercury/blob/master/docs/api/api.md)
+### RPC
+Mercury uses gRPC as a transport layer between nodes.
 
-### Node/Sync API
-#### Pending Documentation
-- `POST /node/sync`
-- `POST /node/status`
-- `POST /node/peer`
+To interact with the RPC endpoints, I recommend using [grpcurl](https://github.com/fullstorydev/grpcurl).
+Then you can run:
+```
+$ grpcurl 127.0.0.1:8081 proto.PublicNode/GetNodeStatus
+{
+  "address": "0xa7ED5257C26Ca5d8aF05FdE04919ce7d4a959147",
+  "name": "tony",
+  "hash": "0000000000000000000000000000000000000000000000000000000000000000"
+}
+```
+Note: Pass the `-insecure` flag to grpcurl if you want to ignore any certificate issues.
 
+To add a new pending transaction (publish a CID)
+```
+grpcurl -insecure 127.0.0.1:8081 proto.PublicNode/AddPendingPublishCIDTransaction <<EOM
+{
+	"cid": "a",
+	"gateway": "b",
+	"toAddress": "c",
+	"name": "d"
+}
+EOM
+
+```
 
 ### Development
 
@@ -97,6 +116,14 @@ State management (used by the node).
 Create and manage your keystore
 
 If you'd like to contribute send me an email at tonyrriemer@gmail.com or message me on discord: driemworks#1849
+
+#### proto
+To update server interface, run:
+```
+protoc --go_out=. --go_opt=paths=source_relative \
+    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+    proto/node.proto
+```
 
 
 ### Issues

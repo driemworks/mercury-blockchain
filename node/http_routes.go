@@ -51,15 +51,15 @@ type sendTokensRequest struct {
 }
 
 type manifestResponse struct {
-	Hash     state.Hash                        `json:"hash"`
-	Manifest map[common.Address]state.Manifest `json:"manifest"`
+	Hash     state.Hash                                `json:"hash"`
+	Manifest map[common.Address]state.CurrentNodeState `json:"manifest"`
 }
 
 type userMailboxResponse struct {
-	Hash    state.Hash     `json:"hash"`
-	Address common.Address `json:"address"`
-	Name    string         `json:"name"`
-	Mailbox state.Manifest `json:"mailbox"`
+	Hash    state.Hash             `json:"hash"`
+	Address common.Address         `json:"address"`
+	Name    string                 `json:"name"`
+	Mailbox state.CurrentNodeState `json:"mailbox"`
 }
 
 type cidAddRequest struct {

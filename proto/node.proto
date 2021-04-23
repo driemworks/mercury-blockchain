@@ -1,0 +1,92 @@
+syntax = "proto3";
+package proto;
+option go_package = "./";
+
+service PublicNode  {
+    // Obtains a node's name
+    rpc GetNodeStatus(NodeInfoRequest) returns (NodeInfoResponse) {}
+    // read/write to known peers
+    rpc ListKnownPeers(ListKnownPeersRequest) returns (stream ListKnownPeersResponse) {}
+    // TODO: Authentication
+    rpc JoinKnownPeers(JoinKnownPeersRequest) returns (JoinKnownPeersResponse) {}
+    // read/write blocks 
+    rpc ListBlocks(ListBlocksRequest) returns (stream BlockResponse) {}
+    // add pending transaction
+    rpc AddPendingPublishCIDTransaction(AddPendingPublishCIDTransactionRequest) returns (AddPendingPublishCIDTransactionResponse) {}
+    // list pending transactions
+    rpc ListPendingTransactions(ListPendingTransactionsRequest) returns (stream PendingTransactionResponse) {}
+}
+
+
+// // StatusResponse TODO
+// type StatusResponse struct {
+// 	Hash         state.Hash               `json:"block_hash"`
+// 	Number       uint64                   `json:"block_number"`
+// 	Alias        string                   `json:"alias"`
+// 	KnownPeers   map[string]core.PeerNode `json:"known_peers"`
+// 	TrustedPeers map[string]core.PeerNode `json:"trusted_peers"`
+// 	PendingTxs   []state.SignedTx         `json:"pending_txs"`
+// }
+
+message ListPendingTransactionsRequest {}
+message PendingTransactionResponse {
+    bytes signedTx = 1;
+}
+// Q: Do I need a different request for each tx type? yes... unless I can use a bytes type and marshal/unmarshal correctly
+message AddPendingPublishCIDTransactionRequest {
+    string toAddress = 3;
+    string cid = 4;
+    string gateway = 5;
+    string name = 6;
+}
+
+message AddPendingPublishCIDTransactionResponse { }
+
+message ListBlocksRequest {
+    string fromBlock = 1;
+}
+message BlockResponse {
+    bytes block = 1;
+}
+message BlockHeaderMessage {
+    string parent = 1;
+    uint64 time = 2;
+    uint64 number = 3;
+    uint32 nonce = 4;
+    string miner = 5;
+    int32 pow = 6;
+}
+message SignedTransactionMessage {
+    Transaction tx = 1;
+    bytes sig  = 2;
+}
+message Transaction {}
+
+message JoinKnownPeersRequest {
+    string name = 1;
+    string ip = 2;
+    uint64 port = 3;
+    string address = 4;
+    bool isBootstrap = 5;
+}
+message JoinKnownPeersResponse  {}
+
+message ListKnownPeersRequest {}
+
+message ListKnownPeersResponse {
+    string name = 1;
+    string ip = 2;
+    uint64 port = 3;
+    bool isBootstrap = 4;
+    string address = 5;
+}
+
+message NodeInfoRequest { }
+
+message NodeInfoResponse {
+    string address = 1;
+    string name = 2;
+    float balance = 3;
+    string hash = 4;
+    uint64 number = 5;
+}
