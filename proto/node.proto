@@ -17,17 +17,6 @@ service PublicNode  {
     rpc ListPendingTransactions(ListPendingTransactionsRequest) returns (stream PendingTransactionResponse) {}
 }
 
-
-// // StatusResponse TODO
-// type StatusResponse struct {
-// 	Hash         state.Hash               `json:"block_hash"`
-// 	Number       uint64                   `json:"block_number"`
-// 	Alias        string                   `json:"alias"`
-// 	KnownPeers   map[string]core.PeerNode `json:"known_peers"`
-// 	TrustedPeers map[string]core.PeerNode `json:"trusted_peers"`
-// 	PendingTxs   []state.SignedTx         `json:"pending_txs"`
-// }
-
 message ListPendingTransactionsRequest {}
 message PendingTransactionResponse {
     bytes signedTx = 1;

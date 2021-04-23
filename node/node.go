@@ -38,10 +38,11 @@ type Node struct {
 	newPendingTXs   chan state.SignedTx // TODO -> needed?
 	isMining        bool
 	name            string
+	tls             bool
 }
 
 func NewNode(name string, datadir string, ip string, port uint64,
-	address common.Address, bootstrap core.PeerNode, password string) *Node {
+	address common.Address, bootstrap core.PeerNode, password string, tls bool) *Node {
 	knownPeers := make(map[string]core.PeerNode)
 	knownPeers[bootstrap.TcpAddress()] = bootstrap
 	return &Node{
@@ -58,6 +59,7 @@ func NewNode(name string, datadir string, ip string, port uint64,
 		newPendingTXs:   make(chan state.SignedTx, 10000),
 		isMining:        false,
 		password:        password, // TODO this is temporary
+		tls:             tls,
 	}
 }
 
@@ -132,92 +134,11 @@ func (n *Node) Run_RPC(ctx context.Context) error {
 	}
 	defer state.Close()
 	n.state = state
-	go n.sync_rpc(ctx)
+	go n.sync(ctx)
 	go n.mine(ctx)
-	n.RunRPCServer(false,
-		"C:\\Users\\tonyr\\work\\driemworks\\mercury-blockchain\\mercury-blockchain\\mercury.pem",
-		"C:\\Users\\tonyr\\work\\driemworks\\mercury-blockchain\\mercury-blockchain\\mercury.pem")
+	n.RunRPCServer(n.tls, "", "")
 	return nil
 }
-
-/**
-* Start the node's HTTP client
- */
-// func (n *Node) Run(ctx context.Context) error {
-// 	fmt.Println(fmt.Sprintf("Listening on: %s:%d", n.info.IP, n.info.Port))
-// 	state, err := state.NewStateFromDisk(n.datadir)
-// 	// trusted peers will need to be tracked as transactions, so that we can recover/rebuild when starting node?
-// 	if err != nil {
-// 		return err
-// 	}
-// 	defer state.Close()
-// 	n.state = state
-// 	go n.sync(ctx)
-// 	go n.mine(ctx)
-// publish a new CID
-// http.HandleFunc("/cid", func(w http.ResponseWriter, r *http.Request) {
-// 	sendCIDHandler(w, r, n)
-// })
-// // add a PeerNode to the trusted peers slice
-// http.HandleFunc("/trusted-peer", func(w http.ResponseWriter, r *http.Request) {
-// 	addTrustedPeerNodeHandler(w, r, n)
-// })
-// /*
-// 	ENCRYPTION OPERATIONS
-// */
-// // for now, only allow string data, but change that in the future
-// http.HandleFunc("/encrypt", func(w http.ResponseWriter, r *http.Request) {
-// 	encryptDataHandler(w, r, n)
-// })
-// // decrypt some data
-// http.HandleFunc("/decrypt", func(w http.ResponseWriter, r *http.Request) {
-// 	decryptDataHandler(w, r, n)
-// })
-// /*
-// 	READ OPERATIONS
-// */
-// http.HandleFunc("/received", func(w http.ResponseWriter, r *http.Request) {
-// 	inboxHandler(w, r, n)
-// })
-// http.HandleFunc("/sent", func(w http.ResponseWriter, r *http.Request) {
-// 	sentHandler(w, r, n)
-// })
-// http.HandleFunc("/info", func(w http.ResponseWriter, r *http.Request) {
-// 	infoHandler(w, r, n)
-// })
-// http.HandleFunc("/peers/known", func(w http.ResponseWriter, r *http.Request) {
-// 	knownPeersHandler(w, r, n)
-// })
-// http.HandleFunc("/peers/trusted", func(w http.ResponseWriter, r *http.Request) {
-// 	trustedPeersHandler(w, r, n)
-// })
-// THE BELOW COULD BE RPC?
-// get node status
-// 	http.HandleFunc("/node/status", func(w http.ResponseWriter, r *http.Request) {
-// 		nodeStatusHandler(w, r, n)
-// 	})
-// 	// peer/block/tx sync
-// 	http.HandleFunc("/node/sync", func(w http.ResponseWriter, r *http.Request) {
-// 		syncHandler(w, r, n)
-// 	})
-// 	// add to known peers
-// 	http.HandleFunc("/node/peer", func(w http.ResponseWriter, r *http.Request) {
-// 		addPeerHandler(w, r, n)
-// 	})
-
-// 	server := &http.Server{Addr: fmt.Sprintf(":%d", n.port)}
-// 	// s.Stop()
-// 	go func() {
-// 		<-ctx.Done()
-// 		_ = server.Close()
-// 	}()
-
-// 	err = server.ListenAndServe()
-// 	if err != http.ErrServerClosed {
-// 		return err
-// 	}
-// 	return nil
-// }
 
 func (n *Node) mine(ctx context.Context) error {
 	var miningCtx context.Context

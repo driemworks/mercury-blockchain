@@ -27,11 +27,7 @@ func runCmd() *cobra.Command {
 			bootstrapIP, _ := cmd.Flags().GetString(flagBootstrapIP)
 			bootstrapPort, _ := cmd.Flags().GetUint64(flagBootstrapPort)
 			tls, _ := cmd.Flags().GetBool(flagTls)
-
-			if tls {
-				fmt.Println("TLS NOT YET IMMPLEMENTED")
-			}
-			// TODO
+			// TODO: How do I hide this?
 			password := getPassPhrase("Password: ", false)
 
 			fmt.Println("")
@@ -57,16 +53,8 @@ func runCmd() *cobra.Command {
 				state.NewAddress(""),
 				false,
 			)
-			// start the node
 			n := node.NewNode(name, getDataDirFromCmd(cmd), ip, port,
-				state.NewAddress(miner), bootstrap, password)
-			// n.RunRPCServer()
-			// start the server
-			// go n.RunRPCServer()
-			// client := node.RunRPCClient(context.Background(), bootstrap.TcpAddress(), tls)
-			// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			// defer cancel()
-			// res, err := client.GetNodeStatus(ctx, &pb.StatusRequest{})
+				state.NewAddress(miner), bootstrap, password, tls)
 			err := n.Run_RPC(context.Background())
 			if err != nil {
 				fmt.Println(err)

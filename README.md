@@ -1,14 +1,6 @@
 # Mercury Blockchain
 Mercury Blockchain (or just Mercury) is a blockchain that acts as a decentralized, event-driven database.
 
-## Motivation
-The origin of this project stems from the question:
-`How can you safely store data in a public IPFS gateway and how can you safely share the content with others?`
-
-The resulting solution is Mercury, a blockchain that acts as a decentralized, event-driven database. Unlike a blockchain like bitcoin where transactions ultimately represent an exchange of some amount of bitcoin, transactions within Mercury represent a state mutation (as represented by a transaction type and an associated payload corresponding to a slice of the node state) published by a node. Transactions in this context only  require that a single node be available, and the mined blocks can be thought of as a global, append-only event log. Event sourcing allows  the *complete* state of the application to be rebuilt or recovered from any state/time, while the usage of a blockchain provides immutability to the stored events.
-
-By configuring transaction types, associated schemas, and implementing appropriate behavior swfor handling state updates as a result of transactions with a given type being mined, Mercury can support nearly any use case. For example, see (TODO: ADD SOME EXAMPLE CONFIGS ONCE THIS IS BUILT OUT)
-
 ## Getting Started
 
 ### Pre requisites
@@ -76,33 +68,56 @@ Note: In order to use the API a node must be running.
 Mercury uses gRPC as a transport layer between nodes.
 Authentication is pending.
 
-#### Get Node Info
+Exposed Services:
 
-To interact with the RPC endpoints, I recommend using [grpcurl](https://github.com/fullstorydev/grpcurl).
-Then you can run:
+#### GetNodeStatus
+Query the node for a status report
+`rpc GetNodeStatus(NodeInfoRequest) returns (NodeInfoResponse) {}`
+
+example with grpcurl:
 ```
-$ grpcurl -plaintext 127.0.0.1:8081 proto.PublicNode/GetNodeStatus
+$ grpcurl -plaintext -d @ 127.0.0.1:8080 proto.PublicNode/GetNodeStatus
 {
   "address": "0xa7ED5257C26Ca5d8aF05FdE04919ce7d4a959147",
   "name": "tony",
   "hash": "0000000000000000000000000000000000000000000000000000000000000000"
 }
 ```
-Note: Pass the `-insecure` flag to grpcurl if you want to ignore any certificate issues.
 
+#### ListKnownPeers
+Retrieve a list of a node's known peers
+`rpc ListKnownPeers(ListKnownPeersRequest) returns (stream ListKnownPeersResponse) {}`
 
-#### Publish content
-To add a new pending transaction (publish a CID)
+#### JoinKnownPeers
+Request to join the known peers of another node
+`rpc JoinKnownPeers(JoinKnownPeersRequest) returns (JoinKnownPeersResponse) {}`
+
+#### ListBlocks
+List blocks mined by a peer from a given hash onwards.
+`rpc ListBlocks(ListBlocksRequest) returns (stream BlockResponse) {}`
+
+#### AddPendingPublishCIDTransaction
+The main functionality (to be extended...): Create a new pending transaction that, once mined, will allow us to send generic tx payloads across nodes.
+`rpc AddPendingPublishCIDTransaction(AddPendingPublishCIDTransactionRequest) returns (AddPendingPublishCIDTransactionResponse) {}`
+
+Example
 ```
 $ grpcurl -plaintext -d @ 127.0.0.1:8080 proto.PublicNode/AddPendingPublishCIDTransaction <<EOM
 {
-"cid": "a",
-"gateway": "b",
-"toAddress": "c",
-"name": "d"
+"cid": "Qm...",
+"gateway": "ipfs.io",
+"toAddress": "0xa7ED5257C26Ca5d8aF05FdE04919ce7d4a959147",
+"name": "file.txt"
 }
 EOM
 ```
+#### ListPendingTransactions
+`rpc ListPendingTransactions(ListPendingTransactionsRequest) returns (stream PendingTransactionResponse) {}`
+List all of a node's pending transactions
+
+
+#### Publish content
+
 
 ## Development
 
