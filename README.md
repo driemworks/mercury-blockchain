@@ -1,7 +1,13 @@
 # Mercury Blockchain
-Mercury Blockchain (or just Mercury) is a blockchain that acts as a decentralized, event-driven database.
+Mercury is an immutable, p2p, event sourced database via blockchain.
+
+## TODOS
+- update peer sync -> Kademlia?
+- update consensus -> DPoS?
 
 ## Getting Started
+### Introduction
+TODO
 
 ### Pre requisites
 - install `go`
@@ -16,7 +22,7 @@ Mercury Blockchain (or just Mercury) is a blockchain that acts as a decentralize
 ```
 go get github.com/driemworks/mercury-blockchain/cli/...
 ```
-Note: if you're running linux you may need to set `export GO111MODULE=on`
+Note: if you're running linux you may need to set `export GO111MODULE=on;go get github.com/driemworks/mercury-blockchain/cli/...`
 
 ## Usage
 ### CLI commands
@@ -54,12 +60,8 @@ There is a crude ui available to interact with your node. Run an ipfs node with 
 Note: The ui is available via pinata, however, due to the crudeness of the UI it requires a local ipfs node to be running in order to be functional. https://gateway.pinata.cloud/ipfs/Qmc55mmfkrmTyhRRYsaU9d3sDUBbMPXrtExnrwVbuESEAY/build/
 
 ### Connect to test network
-
-Note: The bootstrap node is not ready yet.
 To connect with the test network, use `--bootstrap-ip=ec2-34-207-242-13.compute-1.amazonaws.com` and `bootstrap-port=8080`
-`mercury run --name=theo --datadir=.mercury/ --miner=0x990DB19D440124F3d5bA8867b3C35bC0D3c5Eda8 --ip=<your publicly exposed ip or dns address> --port=<your port> --bootstrap-ip=ec2-34-207-242-13.compute-1.amazonaws.com --bootstrap-port=8080`
-
-// ec2 public ip: 34.207.242.13
+`mercury run --name=theo --datadir=.mercury/ --miner=0x990DB19D440124F3d5bA8867b3C35bC0D3c5Eda8 --port=<your port> --bootstrap-ip=ec2-34-207-242-13.compute-1.amazonaws.com --bootstrap-port=8080`
 
 ## API
 Note: In order to use the API a node must be running.
@@ -76,7 +78,7 @@ Query the node for a status report
 
 example with grpcurl:
 ```
-$ grpcurl -plaintext -d @ 127.0.0.1:8080 proto.PublicNode/GetNodeStatus
+$ grpcurl -plaintext 127.0.0.1:8081 proto.PublicNode/GetNodeStatus
 {
   "address": "0xa7ED5257C26Ca5d8aF05FdE04919ce7d4a959147",
   "name": "tony",
@@ -148,7 +150,7 @@ protoc --go_out=. --go_opt=paths=source_relative \
 
 
 ### Issues
-- don't sync with the bootstrap node's boostrap node (if it is itself)
+- TODO: Document any known/in progress issues here
 
 ### Testing
 - example: $ go test ./node/ -test.v -test.run ^TestValidBlockHash$ 
