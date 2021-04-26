@@ -2,8 +2,11 @@ package node
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"time"
@@ -13,7 +16,6 @@ import (
 	"github.com/driemworks/mercury-blockchain/state"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/examples/data"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -70,17 +72,11 @@ func (n *Node) RunRPCServer(tls bool, certFile string, keyFile string) error {
 	// start the server
 	var opts []grpc.ServerOption
 	if tls {
-		if certFile == "" {
-			certFile = data.Path("x509/server_cert.pem")
-		}
-		if keyFile == "" {
-			keyFile = data.Path("x509/server_key.pem")
-		}
-		creds, err := credentials.NewServerTLSFromFile(certFile, keyFile)
+		tlsCredentials, err := loadTLSCredentials_Server()
 		if err != nil {
-			log.Fatalf("Failed to generate credentials %v", err)
+			return err
 		}
-		opts = []grpc.ServerOption{grpc.Creds(creds)}
+		opts = []grpc.ServerOption{grpc.Creds(tlsCredentials)}
 	}
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterPublicNodeServer(grpcServer, newNodeServer(n))
@@ -98,17 +94,43 @@ func (n *Node) RunRPCServer(tls bool, certFile string, keyFile string) error {
 	return nil
 }
 
+func loadTLSCredentials_Server() (credentials.TransportCredentials, error) {
+	serverCert, err := tls.LoadX509KeyPair("resources/cert/server-cert.pem", "resources/cert/server-key.pem")
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	config := &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		ClientAuth:   tls.NoClientCert,
+	}
+	return credentials.NewTLS(config), nil
+}
+
+func loadTLSCredentials_Client() (credentials.TransportCredentials, error) {
+	pemServerCA, err := ioutil.ReadFile("resources/cert/ca-cert.pem")
+	if err != nil {
+		return nil, err
+	}
+	certPool := x509.NewCertPool()
+	if !certPool.AppendCertsFromPEM(pemServerCA) {
+		return nil, fmt.Errorf("failed to add server CA's certificate")
+	}
+	config := &tls.Config{
+		RootCAs: certPool,
+	}
+	return credentials.NewTLS(config), nil
+}
+
 func RunRPCClient(ctx context.Context, tcp string, tls bool, caFile string, serverHostOverride string) (pb.PublicNodeClient, error) {
 	var opts []grpc.DialOption
 	if tls {
-		if caFile == "" {
-			caFile = data.Path("x509/ca_cert.pem")
-		}
-		creds, err := credentials.NewClientTLSFromFile(caFile, serverHostOverride)
+		tlsCreds, err := loadTLSCredentials_Client()
 		if err != nil {
-			log.Fatalf("Failed to create TLS credentials %v", err)
+			log.Fatalf("cannot load TLS credentials: %s", err)
 		}
-		opts = append(opts, grpc.WithTransportCredentials(creds))
+		// NOTE: can add interceptors to add auth headers!
+		opts = append(opts, grpc.WithTransportCredentials(tlsCreds))
 	} else {
 		opts = append(opts, grpc.WithInsecure())
 	}
