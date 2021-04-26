@@ -26,9 +26,9 @@ func runCmd() *cobra.Command {
 			port, _ := cmd.Flags().GetUint64(flagPort)
 			bootstrapIP, _ := cmd.Flags().GetString(flagBootstrapIP)
 			bootstrapPort, _ := cmd.Flags().GetUint64(flagBootstrapPort)
-
-			// TODO
-			// password := getPassPhrase("Password: ", false)
+			tls, _ := cmd.Flags().GetBool(flagTls)
+			// TODO: How do I hide this?
+			password := getPassPhrase("Password: ", false)
 
 			fmt.Println("")
 			fmt.Println("")
@@ -54,8 +54,8 @@ func runCmd() *cobra.Command {
 				false,
 			)
 			n := node.NewNode(name, getDataDirFromCmd(cmd), ip, port,
-				state.NewAddress(miner), bootstrap)
-			err := n.Run(context.Background())
+				state.NewAddress(miner), bootstrap, password, tls)
+			err := n.Run_RPC(context.Background())
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)
@@ -67,9 +67,10 @@ func runCmd() *cobra.Command {
 
 	runCmd.Flags().String(flagName, fmt.Sprintf("user-%d", rand.Int()), "Your username")
 	runCmd.Flags().String(flagMiner, node.DefaultMiner, "miner account of this node to receive block rewards")
-	runCmd.Flags().Uint64(flagPort, 8080, "The ip to run the client on")
+	runCmd.Flags().Uint64(flagPort, 8081, "The ip to run the client on")
 	runCmd.Flags().String(flagIP, "127.0.0.1", "The ip to run the client with")
-	runCmd.Flags().String(flagBootstrapIP, "127.0.0.1", "default bootstrap server to interconnect peers")
-	runCmd.Flags().Uint64(flagBootstrapPort, 8080, "default bootstrap server port to interconnect peers")
+	runCmd.Flags().String(flagBootstrapIP, "127.0.0.1", "the bootstrap server to interconnect peers")
+	runCmd.Flags().Uint64(flagBootstrapPort, 8081, "the bootstrap server port to interconnect peers")
+	runCmd.Flags().Bool(flagTls, false, "true if tls is enabled, false otherwise")
 	return runCmd
 }

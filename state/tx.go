@@ -23,18 +23,18 @@ func NewAddress(value string) common.Address {
 }
 
 type Tx struct {
-	From    common.Address     `json:"from"`
-	To      common.Address     `json:"to"`
-	Payload TransactionPayload `json:"payload"`
-	Nonce   uint               `json:"nonce"`
-	Time    uint64             `json:"time"`
-	Amount  float32            `json:"amount"`
-	Type    string             `json:"type"`
+	From    common.Address `json:"from"`
+	To      common.Address `json:"to"`
+	Payload CID            `json:"payload"`
+	Nonce   uint           `json:"nonce"`
+	Time    uint64         `json:"time"`
+	Amount  float32        `json:"amount"`
 }
 
-type TransactionPayload struct {
-	Value interface{}
-}
+// type TransactionPayload struct {
+// 	// Value interface{}
+// 	cid CID
+// }
 
 func NewTrustPeerTransactionPayload(pn core.PeerNode) TrustPeerTransactionPayload {
 	return TrustPeerTransactionPayload{
@@ -56,8 +56,8 @@ type SignedTx struct {
 	Sig []byte `json:"signature"`
 }
 
-func NewTx(from common.Address, to common.Address, payload TransactionPayload, nonce uint, amount float32, txType string) Tx {
-	return Tx{from, to, payload, nonce, uint64(time.Now().Unix()), amount, txType}
+func NewTx(from common.Address, to common.Address, payload CID, nonce uint, amount float32, txType string) Tx {
+	return Tx{from, to, payload, nonce, uint64(time.Now().Unix()), amount}
 }
 
 func NewSignedTx(tx Tx, sig []byte) SignedTx {

@@ -18,6 +18,7 @@ const flagName = "name"
 const flagKeystoreFile = "keystore"
 const flagBootstrapIP = "bootstrap-ip"
 const flagBootstrapPort = "bootstrap-port"
+const flagTls = "tls"
 
 func main() {
 	var mainCmd = &cobra.Command{

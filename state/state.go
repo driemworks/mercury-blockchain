@@ -7,7 +7,6 @@ import (
 	"os"
 	"reflect"
 	"sort"
-	"strconv"
 
 	"github.com/driemworks/mercury-blockchain/core"
 
@@ -38,7 +37,7 @@ type InboxItem struct {
 	Amount float32        `json:"amount"`
 }
 
-type Manifest struct {
+type CurrentNodeState struct {
 	Sent           []SentItem      `json:"sent"`
 	Inbox          []InboxItem     `json:"inbox"`
 	Balance        float32         `json:"balance"`
@@ -47,7 +46,7 @@ type Manifest struct {
 }
 
 type State struct {
-	Manifest             map[common.Address]Manifest
+	Manifest             map[common.Address]CurrentNodeState
 	Account2Nonce        map[common.Address]uint
 	PendingAccount2Nonce map[common.Address]uint
 	txMempool            []Tx
@@ -73,9 +72,9 @@ func NewStateFromDisk(datadir string) (*State, error) {
 	}
 	// load the manifest -> consider refactoring name..
 	// using manifest as var and Manifest as type, but they are not the same thing
-	manifest := make(map[common.Address]Manifest)
+	manifest := make(map[common.Address]CurrentNodeState)
 	for account, mailbox := range gen.Manifest {
-		manifest[account] = Manifest{mailbox.Sent, mailbox.Inbox, mailbox.Balance, mailbox.PendingBalance, mailbox.TrustedPeers}
+		manifest[account] = CurrentNodeState{mailbox.Sent, mailbox.Inbox, mailbox.Balance, mailbox.PendingBalance, mailbox.TrustedPeers}
 	}
 
 	blockDbFile, err := os.OpenFile(getBlocksDbFilePath(datadir, false), os.O_APPEND|os.O_RDWR, 0600)
@@ -313,63 +312,63 @@ func applyTx(tx SignedTx, s *State) error {
 		return fmt.Errorf("bad Tx. next nonce must be '%d', not '%d'", expectedNonce, tx.Nonce)
 	}
 
-	if s.Manifest[tx.From].PendingBalance < 1 {
-		return fmt.Errorf("bad Tx. You have no remaining balance")
-	}
+	// if s.Manifest[tx.From].PendingBalance < 1 {
+	// 	return fmt.Errorf("bad Tx. You have no remaining balance")
+	// }
 
 	txHash, err := tx.Hash()
 	if err != nil {
 		return fmt.Errorf("bad Tx. Can't calculate tx hash")
 	}
 	// could ignore transactions that aren't mine?
-	payload := tx.Payload
+	cid := tx.Payload
 	// the below will update the state based on the transaction type
-	if tx.Type == TX_TYPE_001 {
-		// map the payload to a CID
-		var cid CID
-		// TODO: Is this really a good way to handle the different unmarshal outputs?
-		switch t := payload.Value.(type) {
-		case map[string]interface{}:
-			cid_string := fmt.Sprintf("%v", t["cid"])
-			gateway_string := fmt.Sprintf("%v", t["ipfs_gateway"])
-			name_string := fmt.Sprintf("%v", t["name"])
-			cid = NewCID(cid_string, gateway_string, name_string)
-		default:
-			cid = payload.Value.(CID)
-		}
-		var senderMailbox = s.Manifest[tx.From]
-		senderMailbox.Sent = append(senderMailbox.Sent, SentItem{tx.To, cid, txHash, tx.Amount})
-		senderMailbox.Balance = senderMailbox.PendingBalance
-		s.Manifest[tx.From] = senderMailbox
-		// update recipient inbox items
-		var receipientMailbox = s.Manifest[tx.To]
-		receipientMailbox.Balance += tx.Amount
-		receipientMailbox.Inbox = append(receipientMailbox.Inbox, InboxItem{tx.From, cid, txHash, tx.Amount})
-		s.Manifest[tx.To] = receipientMailbox
-		// s.Account2Nonce[tx.From] = tx.Nonce
-	} else if tx.Type == TX_TYPE_002 {
-		fmt.Println("Adding trusted peer from transaction")
-		var peerNode core.PeerNode
-		switch t := payload.Value.(type) {
-		case map[string]interface{}:
-			name := fmt.Sprintf("%v", t["name"])
-			ip := fmt.Sprintf("%v", t["ip"])
-			port, _ := strconv.ParseUint(fmt.Sprintf("%v", t["port"]), 10, 64)
-			isBootstrap, _ := strconv.ParseBool(fmt.Sprintf("%v", t["is_bootstrap"]))
-			address := NewAddress(fmt.Sprintf("%v", t["address"]))
-			peerNode = core.NewPeerNode(
-				name, ip, port, isBootstrap, address, true,
-			)
-		default:
-			payload := tx.Payload.Value.(TrustPeerTransactionPayload)
-			peerNode = core.NewPeerNode(
-				payload.Name, payload.IP, payload.Port, payload.IsBootstrap, payload.Address, true,
-			)
-		}
-		trustedPeersClone := s.Manifest[tx.From]
-		trustedPeersClone.TrustedPeers = append(s.Manifest[tx.From].TrustedPeers, peerNode)
-		s.Manifest[tx.From] = trustedPeersClone
-	}
+	// if tx.Type == TX_TYPE_001 {
+	// map the payload to a CID
+	// var cid CID
+	// TODO: Is this really a good way to handle the different unmarshal outputs?
+	// switch t := payload.Value.(type) {
+	// case map[string]interface{}:
+	// 	cid_string := fmt.Sprintf("%v", t["cid"])
+	// 	gateway_string := fmt.Sprintf("%v", t["ipfs_gateway"])
+	// 	name_string := fmt.Sprintf("%v", t["name"])
+	// 	cid = NewCID(cid_string, gateway_string, name_string)
+	// default:
+	// 	cid = payload.Value.(CID)
+	// }
+	var senderMailbox = s.Manifest[tx.From]
+	senderMailbox.Sent = append(senderMailbox.Sent, SentItem{tx.To, cid, txHash, tx.Amount})
+	senderMailbox.Balance = senderMailbox.PendingBalance
+	s.Manifest[tx.From] = senderMailbox
+	// update recipient inbox items
+	var receipientMailbox = s.Manifest[tx.To]
+	receipientMailbox.Balance += tx.Amount
+	receipientMailbox.Inbox = append(receipientMailbox.Inbox, InboxItem{tx.From, cid, txHash, tx.Amount})
+	s.Manifest[tx.To] = receipientMailbox
+	// s.Account2Nonce[tx.From] = tx.Nonce
+	// } else if tx.Type == TX_TYPE_002 {
+	// 	fmt.Println("Adding trusted peer from transaction")
+	// 	var peerNode core.PeerNode
+	// 	switch t := payload.Value.(type) {
+	// 	case map[string]interface{}:
+	// 		name := fmt.Sprintf("%v", t["name"])
+	// 		ip := fmt.Sprintf("%v", t["ip"])
+	// 		port, _ := strconv.ParseUint(fmt.Sprintf("%v", t["port"]), 10, 64)
+	// 		isBootstrap, _ := strconv.ParseBool(fmt.Sprintf("%v", t["is_bootstrap"]))
+	// 		address := NewAddress(fmt.Sprintf("%v", t["address"]))
+	// 		peerNode = core.NewPeerNode(
+	// 			name, ip, port, isBootstrap, address, true,
+	// 		)
+	// 	default:
+	// 		payload := tx.Payload.Value.(TrustPeerTransactionPayload)
+	// 		peerNode = core.NewPeerNode(
+	// 			payload.Name, payload.IP, payload.Port, payload.IsBootstrap, payload.Address, true,
+	// 		)
+	// 	}
+	// 	trustedPeersClone := s.Manifest[tx.From]
+	// 	trustedPeersClone.TrustedPeers = append(s.Manifest[tx.From].TrustedPeers, peerNode)
+	// 	s.Manifest[tx.From] = trustedPeersClone
+	// }
 	s.Account2Nonce[tx.From] = tx.Nonce
 	return nil
 }
@@ -413,7 +412,7 @@ func (s *State) copy() State {
 	copy.latestBlock = s.latestBlock
 	copy.latestBlockHash = s.latestBlockHash
 	copy.txMempool = make([]Tx, len(s.txMempool))
-	copy.Manifest = make(map[common.Address]Manifest)
+	copy.Manifest = make(map[common.Address]CurrentNodeState)
 	copy.Account2Nonce = make(map[common.Address]uint)
 	for account, manifest := range s.Manifest {
 		copy.Manifest[account] = manifest
