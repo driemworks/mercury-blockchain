@@ -4,24 +4,22 @@ option go_package = "./";
 
 service PublicNode  {
     // Obtains a node's name
-    rpc GetNodeStatus(NodeInfoRequest) returns (NodeInfoResponse) {}
-    // read/write to known peers
-    rpc ListKnownPeers(ListKnownPeersRequest) returns (stream ListKnownPeersResponse) {}
-    // TODO: Authentication
-    rpc JoinKnownPeers(JoinKnownPeersRequest) returns (JoinKnownPeersResponse) {}
-    // read/write blocks 
-    rpc ListBlocks(ListBlocksRequest) returns (stream BlockResponse) {}
+    // rpc GetNodeStatus(NodeInfoRequest) returns (NodeInfoResponse) {}
+    // // read/write to known peers
+    // rpc ListKnownPeers(ListKnownPeersRequest) returns (stream ListKnownPeersResponse) {}
+    // // read/write blocks 
+    // rpc ListBlocks(ListBlocksRequest) returns (stream BlockResponse) {}
     // add pending transaction
-    rpc AddPendingPublishCIDTransaction(AddPendingPublishCIDTransactionRequest) returns (AddPendingPublishCIDTransactionResponse) {}
+    rpc AddTransaction(AddPendingPublishCIDTransactionRequest) returns (AddPendingPublishCIDTransactionResponse) {}
     // list pending transactions
-    rpc ListPendingTransactions(ListPendingTransactionsRequest) returns (stream PendingTransactionResponse) {}
+    // rpc ListTransactions(ListPendingTransactionsRequest) returns (stream PendingTransactionResponse) {}
 }
 
 message ListPendingTransactionsRequest {}
 message PendingTransactionResponse {
     bytes signedTx = 1;
 }
-// Q: Do I need a different request for each tx type? yes... unless I can use a bytes type and marshal/unmarshal correctly
+
 message AddPendingPublishCIDTransactionRequest {
     string toAddress = 3;
     string cid = 4;

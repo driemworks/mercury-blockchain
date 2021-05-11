@@ -2,13 +2,13 @@ package node
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/driemworks/mercury-blockchain/core"
@@ -18,21 +18,33 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/ethereum/go-ethereum/common"
+	libp2p "github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peerstore"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	multiaddr "github.com/multiformats/go-multiaddr"
 	"github.com/raphamorim/go-rainbow"
 )
 
 const miningIntervalSeconds = 45
-const syncIntervalSeconds = 30
+const syncIntervalSeconds = 2
+
+// DiscoveryInterval is how often we re-publish our mDNS records.
+const DiscoveryInterval = time.Minute
+
+// DiscoveryServiceTag is used in our mDNS advertisements to discover other chat peers.
+const DiscoveryServiceTag = "mercury-service-tag"
 
 type Node struct {
-	password        string
 	datadir         string
 	ip              string
 	port            uint64
 	state           *state.State
 	info            core.PeerNode
-	knownPeers      map[string]core.PeerNode
 	trustedPeers    map[string]core.PeerNode
 	pendingTXs      map[string]state.SignedTx
 	archivedTXs     map[string]state.SignedTx
@@ -41,26 +53,20 @@ type Node struct {
 	isMining        bool
 	name            string
 	tls             bool
+	host            host.Host
 }
 
-func NewNode(name string, datadir string, ip string, port uint64,
-	address common.Address, bootstrap core.PeerNode, password string, tls bool) *Node {
-	knownPeers := make(map[string]core.PeerNode)
-	knownPeers[bootstrap.TcpAddress()] = bootstrap
+func NewNode(name string, datadir string, ip string, port uint64, tls bool) *Node {
 	return &Node{
 		name:            name,
 		datadir:         datadir,
 		ip:              ip,
 		port:            port,
-		knownPeers:      knownPeers,
-		trustedPeers:    make(map[string]core.PeerNode),
-		info:            core.NewPeerNode(name, ip, port, false, address, true),
 		pendingTXs:      make(map[string]state.SignedTx),
 		archivedTXs:     make(map[string]state.SignedTx),
 		newSyncedBlocks: make(chan state.Block),
 		newPendingTXs:   make(chan state.SignedTx, 10000),
 		isMining:        false,
-		password:        password, // TODO this is temporary
 		tls:             tls,
 	}
 }
@@ -68,11 +74,11 @@ func NewNode(name string, datadir string, ip string, port uint64,
 /**
 Run an RPC server to serve the implementation of the NodeServer
 */
-func (n *Node) RunRPCServer(tls bool, certFile string, keyFile string) error {
+func (n *Node) runRPCServer(tls bool, certFile string, keyFile string) error {
 	// start the server
 	var opts []grpc.ServerOption
 	if tls {
-		tlsCredentials, err := loadTLSCredentials_Server()
+		tlsCredentials, err := loadTLSCredentials()
 		if err != nil {
 			return err
 		}
@@ -81,12 +87,11 @@ func (n *Node) RunRPCServer(tls bool, certFile string, keyFile string) error {
 	grpcServer := grpc.NewServer(opts...)
 	pb.RegisterPublicNodeServer(grpcServer, newNodeServer(n))
 	reflection.Register(grpcServer) // must register reflection api in order to invoke rpc externally
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", n.ip, n.port))
-	// TODO expose this ip:port when DNS service built out?
+	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", n.ip, n.port+1000))
 	if err != nil {
-		fmt.Printf("Could not listen on %s:%d", n.ip, n.port)
+		fmt.Printf("Could not listen on %s:%d", n.ip, n.port+1000)
 	}
-	fmt.Println(fmt.Sprintf("Listening on: %s:%d", n.ip, n.port))
+	fmt.Println(fmt.Sprintf("Listening on: %s:%d", n.ip, n.port+1000))
 	err = grpcServer.Serve(lis)
 	if err != nil {
 		return err
@@ -94,7 +99,7 @@ func (n *Node) RunRPCServer(tls bool, certFile string, keyFile string) error {
 	return nil
 }
 
-func loadTLSCredentials_Server() (credentials.TransportCredentials, error) {
+func loadTLSCredentials() (credentials.TransportCredentials, error) {
 	serverCert, err := tls.LoadX509KeyPair("resources/cert/server-cert.pem", "resources/cert/server-key.pem")
 	if err != nil {
 		fmt.Println(err)
@@ -107,48 +112,7 @@ func loadTLSCredentials_Server() (credentials.TransportCredentials, error) {
 	return credentials.NewTLS(config), nil
 }
 
-func loadTLSCredentials_Client() (credentials.TransportCredentials, error) {
-	pemServerCA, err := ioutil.ReadFile("resources/cert/ca-cert.pem")
-	if err != nil {
-		return nil, err
-	}
-	certPool := x509.NewCertPool()
-	if !certPool.AppendCertsFromPEM(pemServerCA) {
-		return nil, fmt.Errorf("failed to add server CA's certificate")
-	}
-	config := &tls.Config{
-		RootCAs: certPool,
-	}
-	return credentials.NewTLS(config), nil
-}
-
-func RunRPCClient(ctx context.Context, tcp string, tls bool, caFile string, serverHostOverride string) (pb.PublicNodeClient, error) {
-	var opts []grpc.DialOption
-	if tls {
-		tlsCreds, err := loadTLSCredentials_Client()
-		if err != nil {
-			log.Fatalf("cannot load TLS credentials: %s", err)
-		}
-		// NOTE: can add interceptors to add auth headers!
-		opts = append(opts, grpc.WithTransportCredentials(tlsCreds))
-	} else {
-		opts = append(opts, grpc.WithInsecure())
-	}
-
-	opts = append(opts, grpc.WithBlock())
-	conn, err := grpc.Dial(tcp, opts...)
-	if err != nil {
-		log.Fatalf("fail to dial: %v", err)
-		return nil, err
-	}
-	go func() {
-		<-ctx.Done()
-		_ = conn.Close()
-	}()
-	return pb.NewPublicNodeClient(conn), nil
-}
-
-func (n *Node) Run_RPC(ctx context.Context) error {
+func (n *Node) Run(ctx context.Context, port int, peer string, name string) error {
 	// load the state
 	state, err := state.NewStateFromDisk(n.datadir)
 	if err != nil {
@@ -156,10 +120,115 @@ func (n *Node) Run_RPC(ctx context.Context) error {
 	}
 	defer state.Close()
 	n.state = state
-	go n.sync(ctx)
-	go n.mine(ctx)
-	n.RunRPCServer(n.tls, "", "")
+	go n.runRPCServer(n.tls, "", "")
+	// go n.sync(ctx)
+	// convert peer string to multiaddr and add to array
+	err = n.runLibp2pNode(ctx, port, peer, name)
+	if err != nil {
+		return err
+	}
 	return nil
+}
+
+func makeHost(port int, insecure bool) (host.Host, error) {
+	r := rand.Reader
+	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)
+	if err != nil {
+		return nil, err
+	}
+	opts := []libp2p.Option{
+		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", port)),
+		libp2p.Identity(priv),
+		libp2p.DisableRelay(),
+	}
+	if insecure {
+		opts = append(opts, libp2p.NoSecurity)
+	}
+	host, err := libp2p.New(context.Background(), opts...)
+	if err != nil {
+		return nil, err
+	}
+	hostAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ipfs/%s", host.ID().Pretty()))
+	addr := host.Addrs()[0]
+	fullAddr := addr.Encapsulate(hostAddr)
+	fmt.Printf("I am %s\n", fullAddr)
+	fmt.Println(host.ID().Pretty())
+	return host, nil
+}
+
+/*
+	Manually add a peer to the DHT
+	If doRelay = true, then open a new stream and announce yourself to the new peer
+*/
+func addPeers(ctx context.Context, h host.Host, kad *dht.IpfsDHT, peersArg string, doRelay bool) {
+	if len(peersArg) == 0 {
+		return
+	}
+
+	peerStrs := strings.Split(peersArg, ",")
+	for i := 0; i < len(peerStrs); i++ {
+		peerID, peerAddr := MakePeer(peerStrs[i])
+		h.Peerstore().AddAddr(peerID, peerAddr, peerstore.PermanentAddrTTL)
+		_, err := kad.RoutingTable().TryAddPeer(peerID, false, false)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		// if the peer is already in the table, do not call it again
+		if doRelay {
+			peerinfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			err = h.Connect(ctx, *peerinfo)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			s, err := h.NewStream(ctx, peerID, DiscoveryServiceTag)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			s.Write([]byte(""))
+		}
+	}
+}
+
+func (n *Node) runLibp2pNode(ctx context.Context, port int, peer string, name string) error {
+	host, err := makeHost(port, true)
+	n.host = host
+	if err != nil {
+		return err
+	}
+	// 1) Start a DHT
+	kademliaDHT, err := dht.New(ctx, host)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer kademliaDHT.Close()
+	// add bootstrap nodes if provided
+	addPeers(ctx, host, kademliaDHT, peer, true)
+	log.Printf("Listening on %v (Protocols: %v)", host.Addrs(), host.Mux().Protocols())
+	// handle new nodes
+	// strict bootstrap nodes
+	if peer == "" {
+		host.SetStreamHandler(DiscoveryServiceTag, func(s network.Stream) {
+			// TODO this is super gross.. there has to be a better way to handle this
+			fmt.Println("Adding new peer: ", s.Conn().RemoteMultiaddr().String()+"/p2p/"+s.Conn().RemotePeer().String())
+			// extract peer id from the stream
+			addPeers(ctx, host, kademliaDHT, s.Conn().RemoteMultiaddr().String()+"/p2p/"+s.Conn().RemotePeer().String(), false)
+		})
+	}
+	// create a pubsub service using the GossipSub router
+	ps, err := pubsub.NewGossipSub(ctx, host)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	cr, err := JoinChatRoom(ctx, ps, host.ID(), name, "test")
+	for {
+		select {
+		case m := <-cr.PendingTransactions:
+			n.AddPendingTX(*m)
+		}
+	}
 }
 
 func (n *Node) mine(ctx context.Context) error {
@@ -237,23 +306,23 @@ func (n *Node) removeMinedPendingTXs(block state.Block) {
 	}
 }
 
-func (n *Node) AddPeer(peer core.PeerNode) {
-	n.knownPeers[peer.TcpAddress()] = peer
-}
+// func (n *Node) AddPeer(peer core.PeerNode) {
+// 	n.knownPeers[peer.TcpAddress()] = peer
+// }
 
-func (n *Node) RemovePeer(peer core.PeerNode) {
-	delete(n.knownPeers, peer.TcpAddress())
-}
+// func (n *Node) RemovePeer(peer core.PeerNode) {
+// 	delete(n.knownPeers, peer.TcpAddress())
+// }
 
-func (n *Node) IsKnownPeer(peer core.PeerNode) bool {
-	if peer.IP == n.info.IP && peer.Port == n.info.Port {
-		return true
-	}
+// func (n *Node) IsKnownPeer(peer core.PeerNode) bool {
+// 	if peer.IP == n.info.IP && peer.Port == n.info.Port {
+// 		return true
+// 	}
 
-	_, isKnownPeer := n.knownPeers[peer.TcpAddress()]
+// 	_, isKnownPeer := n.knownPeers[peer.TcpAddress()]
 
-	return isKnownPeer
-}
+// 	return isKnownPeer
+// }
 
 /**
 Add a pending transaction to the node's pending transactions array

@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"strings"
 
-	"github.com/driemworks/mercury-blockchain/core"
 	"github.com/driemworks/mercury-blockchain/node"
-	"github.com/driemworks/mercury-blockchain/state"
 
 	"github.com/raphamorim/go-rainbow"
 	"github.com/spf13/cobra"
@@ -21,41 +20,25 @@ func runCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 
 			name, _ := cmd.Flags().GetString(flagName)
-			miner, _ := cmd.Flags().GetString(flagMiner)
-			ip, _ := cmd.Flags().GetString(flagIP)
+			// miner, _ := cmd.Flags().GetString(flagMiner)
+			// ip, _ := cmd.Flags().GetString(flagIP)
 			port, _ := cmd.Flags().GetUint64(flagPort)
 			bootstrapIP, _ := cmd.Flags().GetString(flagBootstrapIP)
-			bootstrapPort, _ := cmd.Flags().GetUint64(flagBootstrapPort)
-			tls, _ := cmd.Flags().GetBool(flagTls)
+			// bootstrapPort, _ := cmd.Flags().GetUint64(flagBootstrapPort)
+			// tls, _ := cmd.Flags().GetBool(flagTls)
 			// TODO: How do I hide this?
-			password := getPassPhrase("Password: ", false)
+			// password := getPassPhrase("Password: ", false)
+			// validate/fix data issues (thanks Windows)
+			if strings.Contains(bootstrapIP, "C:/Program Files/Git") {
+				bootstrapIP = strings.Split(bootstrapIP, "C:/Program Files/Git")[1]
+			}
 
-			fmt.Println("")
-			fmt.Println("")
-			fmt.Println("\t\t " + rainbow.Bold(rainbow.Hex("#B164E3", `/$$$$$$$$ /$$$$$$$$ /$$$$$$$   /$$$$$$  /$$$$$$$ 
-		| $$_____/|__  $$__/| $$__  $$ /$$__  $$| $$__  $$
-		| $$         | $$   | $$  \ $$|__/  \ $$| $$  \ $$
-		| $$$$$      | $$   | $$$$$$$/  /$$$$$$/| $$$$$$$/
-		| $$__/      | $$   | $$____/  /$$____/ | $$____/ 
-		| $$         | $$   | $$      | $$      | $$      
-		| $$         | $$   | $$      | $$$$$$$$| $$      
-		|__/         |__/   |__/      |________/|__/      `)))
-			fmt.Println("")
-			fmt.Println(fmt.Sprintf("\t\t Version %s.%s.%s-beta", Major, Minor, Patch))
-			fmt.Printf("\t\t Using address: %s\n", rainbow.Green(miner))
-			fmt.Printf("\t\t Using bootstrap node: %s:%s\n", rainbow.Green(bootstrapIP), rainbow.Green(fmt.Sprint(bootstrapPort)))
-			fmt.Println("")
-			bootstrap := core.NewPeerNode(
-				"bootstrap",
-				bootstrapIP,
-				bootstrapPort,
-				true,
-				state.NewAddress(""),
-				false,
-			)
-			n := node.NewNode(name, getDataDirFromCmd(cmd), ip, port,
-				state.NewAddress(miner), bootstrap, password, tls)
-			err := n.Run_RPC(context.Background())
+			fmt.Println("********************")
+			fmt.Println("* " + rainbow.Bold(rainbow.Hex("#B164E3", "Mercury")))
+			fmt.Println(fmt.Sprintf("* Version %s.%s.%s-beta", Major, Minor, Patch))
+			fmt.Println("********************")
+			n := node.NewNode(name, getDataDirFromCmd(cmd), "127.0.0.1", port, false)
+			err := n.Run(context.Background(), int(port), bootstrapIP, name)
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)
