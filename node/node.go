@@ -14,6 +14,7 @@ import (
 	"github.com/driemworks/mercury-blockchain/core"
 	pb "github.com/driemworks/mercury-blockchain/proto"
 	"github.com/driemworks/mercury-blockchain/state"
+	"github.com/multiformats/go-multiaddr"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
@@ -29,6 +30,167 @@ import (
 	multiaddr "github.com/multiformats/go-multiaddr"
 	"github.com/raphamorim/go-rainbow"
 )
+
+// var logger = log.Logger{Prefix: "rendezvous"}
+
+func handleStream(stream network.Stream) {
+
+}
+
+func makeRoutedHost(listenPort int, randseed int64, bootstrapPeers []peer.AddrInfo, globalFlag string) (host.Host, error) {
+
+	// If the seed is zero, use real cryptographic randomness. Otherwise, use a
+	// deterministic randomness source to make generated keys stay the same
+	// across multiple runs
+	var r io.Reader
+	if randseed == 0 {
+		r = rand.Reader
+	} else {
+		r = mrand.New(mrand.NewSource(randseed))
+	}
+
+	// Generate a key pair for this host. We will use it at least
+	// to obtain a valid host ID.
+	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := []libp2p.Option{
+		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", listenPort)),
+		libp2p.Identity(priv),
+		libp2p.DefaultTransports,
+		libp2p.DefaultMuxers,
+		libp2p.DefaultSecurity,
+		libp2p.NATPortMap(),
+	}
+
+	ctx := context.Background()
+
+	basicHost, err := libp2p.New(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Construct a datastore (needed by the DHT). This is just a simple, in-memory thread-safe datastore.
+	dstore := dsync.MutexWrap(ds.NewMapDatastore())
+
+	// Make the DHT
+	dht := dht.NewDHT(ctx, basicHost, dstore)
+
+	// Make the routed host
+	routedHost := rhost.Wrap(basicHost, dht)
+
+	// connect to the chosen ipfs nodes
+	err = bootstrapConnect(ctx, routedHost, bootstrapPeers)
+	if err != nil {
+		return nil, err
+	}
+
+	// Bootstrap the host
+	err = dht.Bootstrap(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build host multiaddress
+	hostAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", routedHost.ID().Pretty()))
+
+	// Now we can build a full multiaddress to reach this host
+	// by encapsulating both addresses:
+	// addr := routedHost.Addrs()[0]
+	addrs := routedHost.Addrs()
+	log.Println("I can be reached at:")
+	for _, addr := range addrs {
+		log.Println(addr.Encapsulate(hostAddr))
+	}
+
+	log.Printf("Now run \"./routed-echo -l %d -d %s%s\" on a different terminal\n", listenPort+1, routedHost.ID().Pretty(), globalFlag)
+
+	return routedHost, nil
+}
+
+func (n *Node) RunLibP2P() {
+	ctx := context.Background()
+	r := mrand.New(mrand.NewSource(int64(n.port)))
+	// Creates a new RSA key pair for this host.
+	prvKey, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)
+	if err != nil {
+		panic(err)
+	}
+	sourceMultiAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", n.ip, n.port))
+	host, err := libp2p.New(
+		ctx,
+		libp2p.ListenAddrs(sourceMultiAddr),
+		libp2p.Identity(prvKey),
+	)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Host created: %s", rainbow.Green(host.ID().Pretty()))
+	fmt.Println()
+	fmt.Println(host.Addrs())
+
+	host.SetStreamHandler("/mercury/1.0.0", handleStream)
+	kademliaDHT, err := dht.New(ctx, host)
+	if err != nil {
+		panic(err)
+	}
+	// bootstrap the dht
+	if err = kademliaDHT.Bootstrap(ctx); err != nil {
+		panic(err)
+	}
+	// connect to bootstrap nodes
+	var wg sync.WaitGroup
+	for _, peerAddr := range dht.DefaultBootstrapPeers {
+		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := host.Connect(ctx, *peerinfo); err != nil {
+				fmt.Errorf("failed to establish connection with bootstrap", err)
+			} else {
+				fmt.Printf("Connection established with bootstrap node: %x", *peerinfo)
+			}
+			fmt.Println()
+		}()
+	}
+	wg.Wait()
+	// make yourself discoverable
+	routingDiscovery := discovery.NewRoutingDiscovery(kademliaDHT)
+	discovery.Advertise(ctx, routingDiscovery, "mercury")
+	fmt.Println("Searching for peers...")
+	peerChan, err := routingDiscovery.FindPeers(ctx, "mercury")
+	for peer := range peerChan {
+		if peer.ID == host.ID() {
+			continue
+		}
+		fmt.Println()
+		fmt.Printf("Found peer: %x", peer)
+		fmt.Println()
+		stream, err := host.NewStream(ctx, peer.ID, "/mercury/1.0.0")
+
+		if err != nil {
+			fmt.Errorf("Connection failed:", err)
+			continue
+		}
+		_, err = stream.Write(n.info.Address.Bytes())
+		if err != nil {
+			fmt.Errorf("Failed to write to the stream", err)
+			continue
+		}
+		out, err := ioutil.ReadAll(stream)
+		fmt.Println(out)
+		// } else {
+		// sync pending transactions (using the stream)
+		// rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
+		// whenever there's a new pending transaction, push it to the stream
+		// go writeData(n, rw)
+		// go readData(rw)
+		// }
+	}
+	select {}
+}
 
 const miningIntervalSeconds = 45
 const syncIntervalSeconds = 2
@@ -48,8 +210,8 @@ type Node struct {
 	trustedPeers    map[string]core.PeerNode
 	pendingTXs      map[string]state.SignedTx
 	archivedTXs     map[string]state.SignedTx
-	newSyncedBlocks chan state.Block    // TODO -> needed?
-	newPendingTXs   chan state.SignedTx // TODO -> needed?
+	newSyncedBlocks chan state.Block
+	newPendingTXs   chan state.SignedTx
 	isMining        bool
 	name            string
 	tls             bool
