@@ -13,10 +13,10 @@ import (
 // PendingTxBufSize is the number of incoming pending transactions to buffer for each epoch.
 const PendingTxBufSize = 128
 
-// ChatRoom represents a subscription to a single PubSub topic. Messages
-// can be published to the topic with ChatRoom.Publish, and received
+// Channel represents a subscription to a single PubSub topic. Messages
+// can be published to the topic with Channel.Publish, and received
 // messages are pushed to the Messages channel.
-type ChatRoom struct {
+type Channel struct {
 	// A channel of signed transactions to send new pending transactions to peers
 	PendingTransactions chan *state.SignedTx
 
@@ -30,9 +30,9 @@ type ChatRoom struct {
 	nick     string
 }
 
-// JoinChatRoom tries to subscribe to the PubSub topic for the room name, returning
+// JoinChannel tries to subscribe to the PubSub topic for the room name, returning
 // a ChatRoom on success.
-func JoinChatRoom(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, nickname string, roomName string) (*ChatRoom, error) {
+func JoinChannel(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, nickname string, roomName string) (*Channel, error) {
 	// join the pubsub topic
 	topic, err := ps.Join(topicName(roomName))
 	if err != nil {
@@ -44,7 +44,7 @@ func JoinChatRoom(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, nickna
 	if err != nil {
 		return nil, err
 	}
-	cr := &ChatRoom{
+	cr := &Channel{
 		ctx:                 ctx,
 		ps:                  ps,
 		topic:               topic,
@@ -60,7 +60,7 @@ func JoinChatRoom(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, nickna
 }
 
 // Publish sends a message to the pubsub topic.
-func (cr *ChatRoom) Publish(tx *state.SignedTx) error {
+func (cr *Channel) Publish(tx *state.SignedTx) error {
 	msgBytes, err := json.Marshal(tx)
 	if err != nil {
 		return err
@@ -68,12 +68,12 @@ func (cr *ChatRoom) Publish(tx *state.SignedTx) error {
 	return cr.topic.Publish(cr.ctx, msgBytes)
 }
 
-func (cr *ChatRoom) ListPeers() []peer.ID {
+func (cr *Channel) ListPeers() []peer.ID {
 	return cr.ps.ListPeers(topicName(cr.roomName))
 }
 
 // // readLoop pulls messages from the pubsub topic and pushes them onto the Messages channel.
-func (cr *ChatRoom) readLoop() {
+func (cr *Channel) readLoop() {
 	for {
 		msg, err := cr.sub.Next(cr.ctx)
 		if err != nil {

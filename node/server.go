@@ -75,9 +75,9 @@ type publicNodeServer struct {
 func (server publicNodeServer) AddTransaction(
 	ctx context.Context, addPendingTransactionRequest *pb.AddPendingPublishCIDTransactionRequest) (
 	*pb.AddPendingPublishCIDTransactionResponse, error) {
-	nonce := server.node.state.PendingAccount2Nonce[server.node.info.Address] + 1
+	nonce := server.node.state.PendingAccount2Nonce[server.node.miner] + 1
 	tx := state.NewTx(
-		server.node.info.Address,
+		server.node.miner,
 		state.NewAddress(addPendingTransactionRequest.ToAddress),
 		state.NewCID(
 			addPendingTransactionRequest.Cid,
@@ -87,11 +87,12 @@ func (server publicNodeServer) AddTransaction(
 		nonce, 0, state.TX_TYPE_001,
 	)
 	signedTx, err := wallet.SignTxWithKeystoreAccount(
-		tx, server.node.info.Address, "test", wallet.GetKeystoreDirPath(server.node.datadir))
+		tx, server.node.miner, "test", wallet.GetKeystoreDirPath(server.node.datadir))
 	if err != nil {
 		return nil, err
 	}
 	server.node.AddPendingTX(signedTx)
+	server.node.newPendingTXs <- signedTx
 	return &pb.AddPendingPublishCIDTransactionResponse{}, nil
 }
 

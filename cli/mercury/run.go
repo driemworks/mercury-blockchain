@@ -20,7 +20,7 @@ func runCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 
 			name, _ := cmd.Flags().GetString(flagName)
-			// miner, _ := cmd.Flags().GetString(flagMiner)
+			miner, _ := cmd.Flags().GetString(flagMiner)
 			// ip, _ := cmd.Flags().GetString(flagIP)
 			port, _ := cmd.Flags().GetUint64(flagPort)
 			bootstrapIP, _ := cmd.Flags().GetString(flagBootstrapIP)
@@ -37,7 +37,7 @@ func runCmd() *cobra.Command {
 			fmt.Println("* " + rainbow.Bold(rainbow.Hex("#B164E3", "Mercury")))
 			fmt.Println(fmt.Sprintf("* Version %s.%s.%s-beta", Major, Minor, Patch))
 			fmt.Println("********************")
-			n := node.NewNode(name, getDataDirFromCmd(cmd), "127.0.0.1", port, false)
+			n := node.NewNode(name, getDataDirFromCmd(cmd), miner, "127.0.0.1", port, false)
 			err := n.Run(context.Background(), int(port), bootstrapIP, name)
 			if err != nil {
 				fmt.Println(err)
