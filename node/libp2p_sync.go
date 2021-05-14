@@ -3,7 +3,6 @@ package node
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -20,6 +19,9 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
+/*
+	Build a libp2p host
+*/
 func makeHost(port int, insecure bool) (host.Host, error) {
 	r := rand.Reader
 	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)
@@ -31,6 +33,7 @@ func makeHost(port int, insecure bool) (host.Host, error) {
 		libp2p.Identity(priv),
 		libp2p.DisableRelay(),
 		libp2p.Security(noise.ID, noise.New),
+		libp2p.EnableNATService(),
 	}
 	if insecure {
 		opts = append(opts, libp2p.NoSecurity)
@@ -49,13 +52,12 @@ func makeHost(port int, insecure bool) (host.Host, error) {
 
 /*
 	Manually add a peer to the DHT
-	If doRelay = true, then open a new stream and announce yourself to the new peer
+	If doRelay = true then opena connection with the peer
 */
 func addPeers(ctx context.Context, n Node, kad *dht.IpfsDHT, peersArg string, doRelay bool) {
 	if len(peersArg) == 0 {
 		return
 	}
-
 	peerStrs := strings.Split(peersArg, ",")
 	for i := 0; i < len(peerStrs); i++ {
 		peerID, peerAddr := MakePeer(peerStrs[i])
@@ -64,7 +66,7 @@ func addPeers(ctx context.Context, n Node, kad *dht.IpfsDHT, peersArg string, do
 		if err != nil {
 			log.Fatalln(err)
 		}
-		// if the peer is already in the table, do not call it again
+		// if the peer is already in the DHT, do not call it again
 		if doRelay {
 			peerinfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
 			if err != nil {
@@ -74,20 +76,11 @@ func addPeers(ctx context.Context, n Node, kad *dht.IpfsDHT, peersArg string, do
 			if err != nil {
 				log.Fatalln(err)
 			}
-			s, err := n.host.NewStream(ctx, peerID, DiscoveryServiceTag)
-			if err != nil {
-				log.Fatalln(err)
-			}
-			js, err := json.Marshal(n.pendingTXs)
-			if err != nil {
-				log.Fatalln(err)
-			}
-			s.Write([]byte(js))
 		}
 	}
 }
 
-func (n *Node) runLibp2pNode(ctx context.Context, port int, peer string, name string) error {
+func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string, name string) error {
 	host, err := makeHost(port, false)
 	n.host = host
 	if err != nil {
@@ -100,50 +93,50 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, peer string, name st
 	}
 	defer kademliaDHT.Close()
 	// add bootstrap nodes if provided
-	addPeers(ctx, *n, kademliaDHT, peer, true)
+	addPeers(ctx, *n, kademliaDHT, bootstrapPeer, true)
 	log.Printf("Listening on %v (Protocols: %v)", host.Addrs(), host.Mux().Protocols())
-	// handle new nodes
-	// strict bootstrap nodes
-	if peer == "" {
+	var ps *pubsub.PubSub
+	if bootstrapPeer == "" {
 		host.SetStreamHandler(DiscoveryServiceTag, func(s network.Stream) {
 			// TODO this is pretty bad...
 			addPeers(ctx, *n, kademliaDHT, s.Conn().RemoteMultiaddr().String()+"/p2p/"+s.Conn().RemotePeer().String(), false)
 		})
+		// TODO leaving as localhost for now. Should this be configurable?
+		bootstrapPeer = fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", port, host.ID().Pretty())
 	}
-	// else {
-	// 	host.SetStreamHandler(DiscoveryServiceTag, func(s network.Stream) {
-	// 		// sync incoming bulk pending txs from bootstrap node
-	// 		reader := bufio.NewReader(s)
-	// 		data, err := reader.ReadBytes(0)
-	// 		if err != nil {
-	// 			log.Fatalln(err)
-	// 		}
-	// 		var txs []state.SignedTx
-	// 		err = json.Unmarshal(data, &txs)
-	// 		if err != nil {
-	// 			log.Fatalln(err)
-	// 		}
-	// 		fmt.Printl
-	// 		for _, tx := range txs {
-	// 			n.AddPendingTX(tx)
-	// 		}
-	// 	})
-	// }
+	peerinfo, err := peer.AddrInfoFromP2pAddr(multiaddr.StringCast(bootstrapPeer))
+	tracer, err := pubsub.NewRemoteTracer(ctx, host, *peerinfo)
+	if err != nil {
+		panic(err)
+	}
 	// create a pubsub service using the GossipSub router
-	ps, err := pubsub.NewGossipSub(ctx, host)
+	ps, err = pubsub.NewGossipSub(ctx, host, pubsub.WithEventTracer(tracer))
 	if err != nil {
 		log.Fatalln(err)
 	}
-	// will need a channel for syncing:
-	// 1) pending txs
-	// 2) new blocks
-	cr, err := JoinChannel(ctx, ps, host.ID(), name, "sync")
+	pending_tx_cr, err := JoinPendingTxExchange(ctx, ps, host.ID())
+	new_block_cr, err := JoinNewBlockExchange(ctx, ps, host.ID())
 	for {
 		select {
-		case m := <-cr.PendingTransactions:
+		case m := <-pending_tx_cr.PendingTransactions:
+			// read new pending txs and apply them to state
 			n.AddPendingTX(*m)
 		case tx := <-n.newPendingTXs:
-			cr.Publish(&tx)
+			// publish new pending txs
+			pending_tx_cr.Publish(&tx)
+		case b := <-new_block_cr.NewBlocks:
+			// when there's a new block in the stream (not yours) => Add the block
+			s, _, err := n.state.AddBlock(*b)
+			if err != nil {
+				if s != nil {
+					n.state = s
+				}
+				return err
+			}
+			n.newSyncedBlocks <- *b
+		case block := <-n.newMinedBlocks:
+			// when you've added a new block, publish it to the stream
+			new_block_cr.Publish(&block)
 		}
 	}
 }

@@ -13,45 +13,38 @@ import (
 // PendingTxBufSize is the number of incoming pending transactions to buffer for each epoch.
 const PendingTxBufSize = 128
 
+const PENDING_TX_TOPIC = "PENDING_TX_TOPIC"
+
 // Channel represents a subscription to a single PubSub topic. Messages
 // can be published to the topic with Channel.Publish, and received
 // messages are pushed to the Messages channel.
-type Channel struct {
+type PendingTransactionsExchange struct {
 	// A channel of signed transactions to send new pending transactions to peers
 	PendingTransactions chan *state.SignedTx
-
-	ctx   context.Context
-	ps    *pubsub.PubSub
-	topic *pubsub.Topic
-	sub   *pubsub.Subscription
-
-	roomName string
-	self     peer.ID
-	nick     string
+	ctx                 context.Context
+	ps                  *pubsub.PubSub
+	topic               *pubsub.Topic
+	sub                 *pubsub.Subscription
+	self                peer.ID
 }
 
-// JoinChannel tries to subscribe to the PubSub topic for the room name, returning
+// JoinPendingTxExchange tries to subscribe to the PubSub topic for the room name, returning
 // a ChatRoom on success.
-func JoinChannel(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, nickname string, roomName string) (*Channel, error) {
-	// join the pubsub topic
-	topic, err := ps.Join(topicName(roomName))
+func JoinPendingTxExchange(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID) (*PendingTransactionsExchange, error) {
+	topic, err := ps.Join(PENDING_TX_TOPIC)
 	if err != nil {
 		return nil, err
 	}
-
-	// and subscribe to it
 	sub, err := topic.Subscribe()
 	if err != nil {
 		return nil, err
 	}
-	cr := &Channel{
+	cr := &PendingTransactionsExchange{
 		ctx:                 ctx,
 		ps:                  ps,
 		topic:               topic,
 		sub:                 sub,
 		self:                selfID,
-		nick:                nickname,
-		roomName:            roomName,
 		PendingTransactions: make(chan *state.SignedTx, PendingTxBufSize),
 	}
 	// start reading messages from the subscription in a loop
@@ -60,7 +53,7 @@ func JoinChannel(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, nicknam
 }
 
 // Publish sends a message to the pubsub topic.
-func (cr *Channel) Publish(tx *state.SignedTx) error {
+func (cr *PendingTransactionsExchange) Publish(tx *state.SignedTx) error {
 	msgBytes, err := json.Marshal(tx)
 	if err != nil {
 		return err
@@ -68,12 +61,12 @@ func (cr *Channel) Publish(tx *state.SignedTx) error {
 	return cr.topic.Publish(cr.ctx, msgBytes)
 }
 
-func (cr *Channel) ListPeers() []peer.ID {
-	return cr.ps.ListPeers(topicName(cr.roomName))
+func (cr *PendingTransactionsExchange) ListPeers() []peer.ID {
+	return cr.ps.ListPeers(PENDING_TX_TOPIC)
 }
 
-// // readLoop pulls messages from the pubsub topic and pushes them onto the Messages channel.
-func (cr *Channel) readLoop() {
+// readLoop pulls messages from the pubsub topic and pushes them onto the Messages channel.
+func (cr *PendingTransactionsExchange) readLoop() {
 	for {
 		msg, err := cr.sub.Next(cr.ctx)
 		if err != nil {
@@ -92,8 +85,4 @@ func (cr *Channel) readLoop() {
 		// send valid messages onto the Messages channel
 		cr.PendingTransactions <- cm
 	}
-}
-
-func topicName(roomName string) string {
-	return "chat-room:" + roomName
 }

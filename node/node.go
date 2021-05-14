@@ -32,6 +32,7 @@ type Node struct {
 	pendingTXs      map[string]state.SignedTx
 	archivedTXs     map[string]state.SignedTx
 	newSyncedBlocks chan state.Block
+	newMinedBlocks  chan state.Block
 	newPendingTXs   chan state.SignedTx
 	isMining        bool
 	name            string
@@ -50,6 +51,7 @@ func NewNode(name string, datadir string, miner string, ip string, port uint64, 
 		pendingTXs:      make(map[string]state.SignedTx),
 		archivedTXs:     make(map[string]state.SignedTx),
 		newSyncedBlocks: make(chan state.Block),
+		newMinedBlocks:  make(chan state.Block),
 		newPendingTXs:   make(chan state.SignedTx, 10000),
 		isMining:        false,
 		tls:             tls,
@@ -57,7 +59,6 @@ func NewNode(name string, datadir string, miner string, ip string, port uint64, 
 }
 
 func (n *Node) Run(ctx context.Context, port int, peer string, name string) error {
-	// load the state
 	state, err := state.NewStateFromDisk(n.datadir)
 	if err != nil {
 		return err
@@ -126,6 +127,7 @@ func (n *Node) minePendingTXs(ctx context.Context) error {
 
 	n.removeMinedPendingTXs(minedBlock)
 	_, _, err = n.state.AddBlock(minedBlock)
+	n.newMinedBlocks <- minedBlock
 	if err != nil {
 		return err
 	}
@@ -147,24 +149,6 @@ func (n *Node) removeMinedPendingTXs(block state.Block) {
 		}
 	}
 }
-
-// func (n *Node) AddPeer(peer core.PeerNode) {
-// 	n.knownPeers[peer.TcpAddress()] = peer
-// }
-
-// func (n *Node) RemovePeer(peer core.PeerNode) {
-// 	delete(n.knownPeers, peer.TcpAddress())
-// }
-
-// func (n *Node) IsKnownPeer(peer core.PeerNode) bool {
-// 	if peer.IP == n.info.IP && peer.Port == n.info.Port {
-// 		return true
-// 	}
-
-// 	_, isKnownPeer := n.knownPeers[peer.TcpAddress()]
-
-// 	return isKnownPeer
-// }
 
 /**
 Add a pending transaction to the node's pending transactions array

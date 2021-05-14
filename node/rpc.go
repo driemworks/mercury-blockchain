@@ -31,7 +31,7 @@ func (n *Node) runRPCServer(certFile string, keyFile string) error {
 	if err != nil {
 		fmt.Printf("Could not listen on %s:%d", n.ip, n.port+1000)
 	}
-	fmt.Println(fmt.Sprintf("Listening on: %s:%d", n.ip, n.port+1000))
+	fmt.Println(fmt.Sprintf("RPC server listening on: %s:%d", n.ip, n.port+1000))
 	err = grpcServer.Serve(lis)
 	if err != nil {
 		return err
