@@ -13,7 +13,7 @@ import (
 // PendingTxBufSize is the number of incoming pending transactions to buffer for each epoch.
 const PendingTxBufSize = 128
 
-const PENDING_TX_TOPIC = "PENDING_TX_TOPIC"
+// const PENDING_TX_TOPIC = "PENDING_TX_TOPIC"
 
 // Channel represents a subscription to a single PubSub topic. Messages
 // can be published to the topic with Channel.Publish, and received
@@ -35,6 +35,7 @@ func JoinPendingTxExchange(ctx context.Context, ps *pubsub.PubSub, selfID peer.I
 	if err != nil {
 		return nil, err
 	}
+	// TODO: can I add an event handler here to handle new pending tx events?
 	sub, err := topic.Subscribe()
 	if err != nil {
 		return nil, err

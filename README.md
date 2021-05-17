@@ -1,9 +1,11 @@
 # Mercury Blockchain
-A blockchain whose purpose is still TBD... 
+Mercury is simple a blockchain built on top of libp2p.
 
 ## TODOS
-- Sync blocks, pending txs when new peer joins the network
-- Replace PoW with more efficient consensus (DPoS or something along those lines)
+- Enable trace for all topics, read trace when joining topics
+- Replace PoW with more efficient consensus algorithm (DPoS or something along those lines)
+- determine exactly what the transaction payload should be...
+- code cleanup
 
 ## Getting Started
 ### Introduction

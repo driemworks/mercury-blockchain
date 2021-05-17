@@ -114,6 +114,7 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 	if err != nil {
 		log.Fatalln(err)
 	}
+	// pending_tx_channel, err := InitChannel(ctx, PENDING_TX_TOPIC, 128, ps, host.ID())
 	pending_tx_cr, err := JoinPendingTxExchange(ctx, ps, host.ID())
 	new_block_cr, err := JoinNewBlockExchange(ctx, ps, host.ID())
 	for {
@@ -124,6 +125,18 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 		case tx := <-n.newPendingTXs:
 			// publish new pending txs
 			pending_tx_cr.Publish(&tx)
+		// case data := <-pending_tx_channel.data:
+		// 	// read new pending txs and apply them to state
+		// 	// need to convert map[string]interface{} to signed tx
+		// 	signed_tx := state.NewSignedTx(
+		// 		,
+		// 		data["signature"].([]byte),
+		// 	)
+
+		// 	n.AddPendingTX(*tx)
+		// case tx := <-n.newPendingTXs:
+		// 	// publish new pending txs
+		// 	pending_tx_channel.Publish(&tx)
 		case b := <-new_block_cr.NewBlocks:
 			// when there's a new block in the stream (not yours) => Add the block
 			s, _, err := n.state.AddBlock(*b)

@@ -16,7 +16,6 @@ import (
 
 const BlockReward = float32(10)
 
-// TODO used as both a request and response... maybe move to common?
 type CID struct {
 	CID         string `json:"cid"`
 	IPFSGateway string `json:"ipfs_gateway"`
@@ -73,7 +72,7 @@ func NewStateFromDisk(datadir string) (*State, error) {
 	// load the manifest -> consider refactoring name..
 	// using manifest as var and Manifest as type, but they are not the same thing
 	manifest := make(map[common.Address]CurrentNodeState)
-	for account, mailbox := range gen.Manifest {
+	for account, mailbox := range gen.State {
 		manifest[account] = CurrentNodeState{mailbox.Sent, mailbox.Inbox, mailbox.Balance, mailbox.PendingBalance, mailbox.TrustedPeers}
 	}
 

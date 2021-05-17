@@ -6,22 +6,19 @@ import (
 
 	"github.com/driemworks/mercury-blockchain/state"
 	"github.com/libp2p/go-libp2p-core/peer"
-
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 
-// TODO consider rethinking this design.. should use an interface?
-// topic buf size is the number of incoming pending transactions to buffer for each epoch.
-const TopicBufSize = 128
-
-// const NEW_BLOCKS_TOPIC = "NEW_BLOCKS_TOPIC"
+const PENDING_TX_TOPIC = "PENDING_TX_TOPIC"
+const NEW_BLOCKS_TOPIC = "NEW_BLOCKS_TOPIC"
 
 // Channel represents a subscription to a single PubSub topic. Messages
 // can be published to the topic with Channel.Publish, and received
 // messages are pushed to the Messages channel.
-type NewBlockExchange struct {
+type Channel struct {
 	// A channel of signed transactions to send new pending transactions to peers
-	NewBlocks chan *state.Block
+	data      chan map[string]interface{}
+	topicName string
 	ctx       context.Context
 	ps        *pubsub.PubSub
 	topic     *pubsub.Topic
@@ -29,10 +26,8 @@ type NewBlockExchange struct {
 	self      peer.ID
 }
 
-// Join tries to subscribe to the PubSub topic for the room name, returning
-// a ChatRoom on success.
-func JoinNewBlockExchange(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID) (*NewBlockExchange, error) {
-	topic, err := ps.Join(NEW_BLOCKS_TOPIC)
+func InitChannel(ctx context.Context, topicName string, bufSize int, ps *pubsub.PubSub, selfID peer.ID) (*Channel, error) {
+	topic, err := ps.Join(topicName)
 	if err != nil {
 		return nil, err
 	}
@@ -40,21 +35,21 @@ func JoinNewBlockExchange(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID
 	if err != nil {
 		return nil, err
 	}
-	cr := &NewBlockExchange{
-		ctx:       ctx,
-		ps:        ps,
-		topic:     topic,
-		sub:       sub,
-		self:      selfID,
-		NewBlocks: make(chan *state.Block, TopicBufSize),
+	ch := &Channel{
+		ctx:   ctx,
+		ps:    ps,
+		topic: topic,
+		sub:   sub,
+		self:  selfID,
+		data:  make(chan map[string]interface{}, bufSize),
 	}
 	// start reading messages from the subscription in a loop
-	go cr.readLoop()
-	return cr, nil
+	go ch.readLoop()
+	return ch, nil
 }
 
 // Publish sends a message to the pubsub topic.
-func (cr *NewBlockExchange) Publish(tx *state.Block) error {
+func (cr *Channel) Publish(tx *state.SignedTx) error {
 	msgBytes, err := json.Marshal(tx)
 	if err != nil {
 		return err
@@ -62,28 +57,28 @@ func (cr *NewBlockExchange) Publish(tx *state.Block) error {
 	return cr.topic.Publish(cr.ctx, msgBytes)
 }
 
-func (cr *NewBlockExchange) ListPeers() []peer.ID {
-	return cr.ps.ListPeers(PENDING_TX_TOPIC)
+func (cr *Channel) ListPeers() []peer.ID {
+	return cr.ps.ListPeers(cr.topicName)
 }
 
 // readLoop pulls messages from the pubsub topic and pushes them onto the Messages channel.
-func (cr *NewBlockExchange) readLoop() {
+func (cr *Channel) readLoop() {
 	for {
 		msg, err := cr.sub.Next(cr.ctx)
 		if err != nil {
-			close(cr.NewBlocks)
+			close(cr.data)
 			return
 		}
 		// only forward messages delivered by others
 		if msg.ReceivedFrom == cr.self {
 			continue
 		}
-		cm := new(state.Block)
+		cm := new(map[string]interface{})
 		err = json.Unmarshal(msg.Data, cm)
 		if err != nil {
 			continue
 		}
-		// send valid messages onto the Messages channel
-		cr.NewBlocks <- cm
+		// send valid txs to data chan
+		cr.data <- *cm
 	}
 }
