@@ -3,8 +3,7 @@ Mercury is simple a blockchain built on top of libp2p.
 
 ## TODOS
 - Enable trace for all topics, read trace when joining topics
-- Replace PoW with more efficient consensus algorithm (DPoS or something along those lines)
-- determine exactly what the transaction payload should be...
+- Replace PoW with more efficient consensus algorithm
 - code cleanup
 
 ## Getting Started
@@ -78,12 +77,12 @@ Query the node for a status report
 
 example with grpcurl:
 ```
-$ grpcurl -plaintext 127.0.0.1:8081 proto.PublicNode/GetNodeStatus
-{
-  "address": "0xa7ED5257C26Ca5d8aF05FdE04919ce7d4a959147",
-  "name": "tony",
-  "hash": "0000000000000000000000000000000000000000000000000000000000000000"
-}
+grpcurl -plaintext 127.0.0.1:9081 proto.NodeService/GetNodeStatus
+>> {
+>>   "address": "0xa7ED5257C26Ca5d8aF05FdE04919ce7d4a959147",
+>>   "name": "tony",
+>>   "hash": "0000000000000000000000000000000000000000000000000000000000000000"
+>> }
 ```
 
 #### ListKnownPeers
@@ -100,7 +99,7 @@ The main functionality (to be extended...): Create a new pending transaction tha
 
 Example
 ```
-$ grpcurl -plaintext -d @ 127.0.0.1:8080 proto.PublicNode/AddTransaction <<EOM
+grpcurl -plaintext -d @ 127.0.0.1:9081 proto.NodeService/AddTransaction <<EOM
 {
 "cid": "Qm...",
 "gateway": "ipfs.io",
@@ -108,6 +107,7 @@ $ grpcurl -plaintext -d @ 127.0.0.1:8080 proto.PublicNode/AddTransaction <<EOM
 "name": "file.txt"
 }
 EOM
+
 ```
 #### ListPendingTransactions
 `rpc ListPendingTransactions(ListPendingTransactionsRequest) returns (stream PendingTransactionResponse) {}`

@@ -14,100 +14,134 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// PublicNodeClient is the client API for PublicNode service.
+// NodeServiceClient is the client API for NodeService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type PublicNodeClient interface {
+type NodeServiceClient interface {
 	// Obtains a node's name
-	// rpc GetNodeStatus(NodeInfoRequest) returns (NodeInfoResponse) {}
+	GetNodeStatus(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoResponse, error)
 	// // read/write to known peers
 	// rpc ListKnownPeers(ListKnownPeersRequest) returns (stream ListKnownPeersResponse) {}
 	// // read/write blocks
 	// rpc ListBlocks(ListBlocksRequest) returns (stream BlockResponse) {}
 	// add pending transaction
-	AddTransaction(ctx context.Context, in *AddPendingPublishCIDTransactionRequest, opts ...grpc.CallOption) (*AddPendingPublishCIDTransactionResponse, error)
+	AddTransaction(ctx context.Context, in *AddPendingTransactionRequest, opts ...grpc.CallOption) (*AddPendingTransactionResponse, error)
 }
 
-type publicNodeClient struct {
+type nodeServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewPublicNodeClient(cc grpc.ClientConnInterface) PublicNodeClient {
-	return &publicNodeClient{cc}
+func NewNodeServiceClient(cc grpc.ClientConnInterface) NodeServiceClient {
+	return &nodeServiceClient{cc}
 }
 
-func (c *publicNodeClient) AddTransaction(ctx context.Context, in *AddPendingPublishCIDTransactionRequest, opts ...grpc.CallOption) (*AddPendingPublishCIDTransactionResponse, error) {
-	out := new(AddPendingPublishCIDTransactionResponse)
-	err := c.cc.Invoke(ctx, "/proto.PublicNode/AddTransaction", in, out, opts...)
+func (c *nodeServiceClient) GetNodeStatus(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoResponse, error) {
+	out := new(NodeInfoResponse)
+	err := c.cc.Invoke(ctx, "/proto.NodeService/GetNodeStatus", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// PublicNodeServer is the server API for PublicNode service.
-// All implementations must embed UnimplementedPublicNodeServer
+func (c *nodeServiceClient) AddTransaction(ctx context.Context, in *AddPendingTransactionRequest, opts ...grpc.CallOption) (*AddPendingTransactionResponse, error) {
+	out := new(AddPendingTransactionResponse)
+	err := c.cc.Invoke(ctx, "/proto.NodeService/AddTransaction", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// NodeServiceServer is the server API for NodeService service.
+// All implementations must embed UnimplementedNodeServiceServer
 // for forward compatibility
-type PublicNodeServer interface {
+type NodeServiceServer interface {
 	// Obtains a node's name
-	// rpc GetNodeStatus(NodeInfoRequest) returns (NodeInfoResponse) {}
+	GetNodeStatus(context.Context, *NodeInfoRequest) (*NodeInfoResponse, error)
 	// // read/write to known peers
 	// rpc ListKnownPeers(ListKnownPeersRequest) returns (stream ListKnownPeersResponse) {}
 	// // read/write blocks
 	// rpc ListBlocks(ListBlocksRequest) returns (stream BlockResponse) {}
 	// add pending transaction
-	AddTransaction(context.Context, *AddPendingPublishCIDTransactionRequest) (*AddPendingPublishCIDTransactionResponse, error)
-	mustEmbedUnimplementedPublicNodeServer()
+	AddTransaction(context.Context, *AddPendingTransactionRequest) (*AddPendingTransactionResponse, error)
+	mustEmbedUnimplementedNodeServiceServer()
 }
 
-// UnimplementedPublicNodeServer must be embedded to have forward compatible implementations.
-type UnimplementedPublicNodeServer struct {
+// UnimplementedNodeServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedNodeServiceServer struct {
 }
 
-func (UnimplementedPublicNodeServer) AddTransaction(context.Context, *AddPendingPublishCIDTransactionRequest) (*AddPendingPublishCIDTransactionResponse, error) {
+func (UnimplementedNodeServiceServer) GetNodeStatus(context.Context, *NodeInfoRequest) (*NodeInfoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetNodeStatus not implemented")
+}
+func (UnimplementedNodeServiceServer) AddTransaction(context.Context, *AddPendingTransactionRequest) (*AddPendingTransactionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddTransaction not implemented")
 }
-func (UnimplementedPublicNodeServer) mustEmbedUnimplementedPublicNodeServer() {}
+func (UnimplementedNodeServiceServer) mustEmbedUnimplementedNodeServiceServer() {}
 
-// UnsafePublicNodeServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to PublicNodeServer will
+// UnsafeNodeServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to NodeServiceServer will
 // result in compilation errors.
-type UnsafePublicNodeServer interface {
-	mustEmbedUnimplementedPublicNodeServer()
+type UnsafeNodeServiceServer interface {
+	mustEmbedUnimplementedNodeServiceServer()
 }
 
-func RegisterPublicNodeServer(s grpc.ServiceRegistrar, srv PublicNodeServer) {
-	s.RegisterService(&PublicNode_ServiceDesc, srv)
+func RegisterNodeServiceServer(s grpc.ServiceRegistrar, srv NodeServiceServer) {
+	s.RegisterService(&NodeService_ServiceDesc, srv)
 }
 
-func _PublicNode_AddTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AddPendingPublishCIDTransactionRequest)
+func _NodeService_GetNodeStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NodeInfoRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PublicNodeServer).AddTransaction(ctx, in)
+		return srv.(NodeServiceServer).GetNodeStatus(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.PublicNode/AddTransaction",
+		FullMethod: "/proto.NodeService/GetNodeStatus",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PublicNodeServer).AddTransaction(ctx, req.(*AddPendingPublishCIDTransactionRequest))
+		return srv.(NodeServiceServer).GetNodeStatus(ctx, req.(*NodeInfoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// PublicNode_ServiceDesc is the grpc.ServiceDesc for PublicNode service.
+func _NodeService_AddTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddPendingTransactionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NodeServiceServer).AddTransaction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.NodeService/AddTransaction",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NodeServiceServer).AddTransaction(ctx, req.(*AddPendingTransactionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// NodeService_ServiceDesc is the grpc.ServiceDesc for NodeService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var PublicNode_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "proto.PublicNode",
-	HandlerType: (*PublicNodeServer)(nil),
+var NodeService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "proto.NodeService",
+	HandlerType: (*NodeServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "GetNodeStatus",
+			Handler:    _NodeService_GetNodeStatus_Handler,
+		},
+		{
 			MethodName: "AddTransaction",
-			Handler:    _PublicNode_AddTransaction_Handler,
+			Handler:    _NodeService_AddTransaction_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

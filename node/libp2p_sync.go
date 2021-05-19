@@ -3,10 +3,14 @@ package node
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 
+	"github.com/driemworks/mercury-blockchain/state"
+	"github.com/fatih/structs"
 	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -17,6 +21,11 @@ import (
 	noise "github.com/libp2p/go-libp2p-noise"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
+)
+
+const (
+	DiscoveryServiceTag            = "mercury-service-tag"
+	DiscoveryServiceTag_PendingTxs = "pending_txs"
 )
 
 /*
@@ -33,7 +42,6 @@ func makeHost(port int, insecure bool) (host.Host, error) {
 		libp2p.Identity(priv),
 		libp2p.DisableRelay(),
 		libp2p.Security(noise.ID, noise.New),
-		libp2p.EnableNATService(),
 	}
 	if insecure {
 		opts = append(opts, libp2p.NoSecurity)
@@ -114,31 +122,29 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 	if err != nil {
 		log.Fatalln(err)
 	}
-	// pending_tx_channel, err := InitChannel(ctx, PENDING_TX_TOPIC, 128, ps, host.ID())
-	pending_tx_cr, err := JoinPendingTxExchange(ctx, ps, host.ID())
+	pending_tx_channel, err := InitChannel(ctx, PENDING_TX_TOPIC, 128, ps, host.ID())
 	new_block_cr, err := JoinNewBlockExchange(ctx, ps, host.ID())
 	for {
 		select {
-		case m := <-pending_tx_cr.PendingTransactions:
-			// read new pending txs and apply them to state
-			n.AddPendingTX(*m)
+		case data := <-pending_tx_channel.Data:
+			txMap := data["Tx"]
+			bytes, err := json.Marshal(txMap)
+			if err != nil {
+				return err
+			}
+			var tx state.Tx
+			err = json.Unmarshal(bytes, &tx)
+			if err != nil {
+				return err
+			}
+			sig_string := fmt.Sprintf("%v", data["Sig"])
+			sig, _ := base64.RawStdEncoding.DecodeString(sig_string)
+			signedTx := state.NewSignedTx(tx, sig)
+			n.AddPendingTX(signedTx)
 		case tx := <-n.newPendingTXs:
-			// publish new pending txs
-			pending_tx_cr.Publish(&tx)
-		// case data := <-pending_tx_channel.data:
-		// 	// read new pending txs and apply them to state
-		// 	// need to convert map[string]interface{} to signed tx
-		// 	signed_tx := state.NewSignedTx(
-		// 		,
-		// 		data["signature"].([]byte),
-		// 	)
-
-		// 	n.AddPendingTX(*tx)
-		// case tx := <-n.newPendingTXs:
-		// 	// publish new pending txs
-		// 	pending_tx_channel.Publish(&tx)
+			txMap := structs.Map(tx)
+			pending_tx_channel.Publish(txMap)
 		case b := <-new_block_cr.NewBlocks:
-			// when there's a new block in the stream (not yours) => Add the block
 			s, _, err := n.state.AddBlock(*b)
 			if err != nil {
 				if s != nil {
@@ -148,8 +154,11 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 			}
 			n.newSyncedBlocks <- *b
 		case block := <-n.newMinedBlocks:
-			// when you've added a new block, publish it to the stream
 			new_block_cr.Publish(&block)
 		}
 	}
+}
+
+type TransactionTransmissionWrapper struct {
+	SignedTx state.SignedTx `json:"signed_transaction"`
 }

@@ -25,7 +25,7 @@ func (n *Node) runRPCServer(certFile string, keyFile string) error {
 		opts = []grpc.ServerOption{grpc.Creds(tlsCredentials)}
 	}
 	grpcServer := grpc.NewServer(opts...)
-	pb.RegisterPublicNodeServer(grpcServer, newNodeServer(n))
+	pb.RegisterNodeServiceServer(grpcServer, newNodeServer(n))
 	reflection.Register(grpcServer) // must register reflection api in order to invoke rpc externally
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", n.ip, n.port+1000))
 	if err != nil {

@@ -15,11 +15,6 @@ import (
 )
 
 const miningIntervalSeconds = 45
-const syncIntervalSeconds = 2
-
-// DiscoveryServiceTag is used in our mDNS advertisements to discover other chat peers.
-const DiscoveryServiceTag = "mercury-service-tag"
-const DiscoveryServiceTag_PendingTxs = "pending_txs"
 
 type Node struct {
 	datadir         string
@@ -27,8 +22,6 @@ type Node struct {
 	port            uint64
 	miner           common.Address
 	state           *state.State
-	info            core.PeerNode
-	trustedPeers    map[string]core.PeerNode
 	pendingTXs      map[string]state.SignedTx
 	archivedTXs     map[string]state.SignedTx
 	newSyncedBlocks chan state.Block
@@ -117,7 +110,7 @@ func (n *Node) minePendingTXs(ctx context.Context) error {
 	blockToMine := NewPendingBlock(
 		n.state.LatestBlockHash(),
 		n.state.NextBlockNumber(),
-		n.info.Address,
+		n.miner,
 		n.getPendingTXsAsArray(),
 	)
 	minedBlock, err := Mine(ctx, blockToMine)
@@ -173,36 +166,16 @@ func (n *Node) AddPendingTX(tx state.SignedTx) error {
 		}
 
 		fmt.Printf("Adding pending transactions: \n%s\n", &prettyTxJSON)
-
+		tmpFrom := n.state.Catalog[tx.Author]
+		if tmpFrom.Balance <= 0 {
+			// for now...
+			tmpFrom.Balance = 10
+			// return fmt.Errorf("Insufficient balance")
+		}
+		tmpFrom.Balance -= 1
 		n.pendingTXs[txHash.Hex()] = tx
-		// n.newPendingTXs <- tx
-		tmpFrom := n.state.Manifest[tx.From]
-		if tmpFrom.Sent == nil {
-			tmpFrom.Inbox = make([]state.InboxItem, 0)
-			tmpFrom.Sent = make([]state.SentItem, 0)
-			// uncomment the below in order to automatically reward new addresses
-			// tmpFrom.Balance += manifest.BlockReward
-			// tmpFrom.PendingBalance += tmpFrom.Balance
-		}
-		// TODO - the cost of the transaction is one coin for now, but should this always be the case?
-		//         could file size factor into the cost? -> maybe when I get to the concept of gas?
-		if tx.Amount > 0 {
-			tmpFrom.PendingBalance -= tx.Amount
-		}
-		n.state.Manifest[tx.From] = tmpFrom
-		// increase the account to nonce value => allows us to support mining blocks with multiple transactions
-		n.state.PendingAccount2Nonce[tx.From]++
-		tmpTo := n.state.Manifest[tx.To]
-		// needed?
-		if tmpTo.Inbox == nil {
-			tmpTo.Sent = make([]state.SentItem, 0)
-			tmpTo.Inbox = make([]state.InboxItem, 0)
-			// uncomment the below in order to automatically reward new addresses
-			// tmpTo.Balance += manifest.BlockReward
-			// tmpTo.PendingBalance += tmpTo.Balance
-		}
-		tmpTo.PendingBalance += tx.Amount
-		n.state.Manifest[tx.To] = tmpTo
+		n.state.Catalog[tx.Author] = tmpFrom
+		n.state.PendingAccount2Nonce[tx.Author]++
 	}
 	return nil
 }

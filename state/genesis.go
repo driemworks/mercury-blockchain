@@ -23,7 +23,7 @@ var genesisJson = `
 }`
 
 type Genesis struct {
-	State map[common.Address]CurrentNodeState `json: "state"`
+	State map[common.Address]CurrentNodeState `json:"state"`
 }
 
 func loadGenesis(filepath string) (Genesis, error) {

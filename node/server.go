@@ -8,20 +8,24 @@ import (
 	"github.com/driemworks/mercury-blockchain/wallet"
 )
 
-type publicNodeServer struct {
-	pb.UnimplementedPublicNodeServer
+type nodeServer struct {
+	pb.UnimplementedNodeServiceServer
 	node *Node
 }
 
-// func (server publicNodeServer) GetNodeStatus(ctx context.Context, statusRequest *pb.NodeInfoRequest) (*pb.NodeInfoResponse, error) {
-// 	return &pb.NodeInfoResponse{
-// 		Address: server.node.info.Address.String(),
-// 		Name:    server.node.name,
-// 		Balance: server.node.state.Manifest[server.node.info.Address].Balance,
-// 		Hash:    server.node.state.LatestBlockHash().Hex(),
-// 		Number:  server.node.state.LatestBlock().Header.Number,
-// 	}, nil
-// }
+func (server nodeServer) GetNodeStatus(ctx context.Context, statusRequest *pb.NodeInfoRequest) (*pb.NodeInfoResponse, error) {
+	nodeState := server.node.state.Catalog[server.node.miner]
+	var channels []string
+	for _, bytes := range nodeState.Channels {
+		// this probably isn't right...
+		channels = append(channels, string(bytes))
+	}
+	return &pb.NodeInfoResponse{
+		Address:  server.node.miner.Hex(),
+		Balance:  nodeState.Balance,
+		Channels: channels,
+	}, nil
+}
 
 /*
 	Read/Write known peers
@@ -72,19 +76,12 @@ type publicNodeServer struct {
 /*
 	Read/Write pending transactions
 */
-func (server publicNodeServer) AddTransaction(
-	ctx context.Context, addPendingTransactionRequest *pb.AddPendingPublishCIDTransactionRequest) (
-	*pb.AddPendingPublishCIDTransactionResponse, error) {
+func (server nodeServer) AddTransaction(
+	ctx context.Context, addPendingTransactionRequest *pb.AddPendingTransactionRequest) (
+	*pb.AddPendingTransactionResponse, error) {
 	nonce := server.node.state.PendingAccount2Nonce[server.node.miner] + 1
 	tx := state.NewTx(
-		server.node.miner,
-		state.NewAddress(addPendingTransactionRequest.ToAddress),
-		state.NewCID(
-			addPendingTransactionRequest.Cid,
-			addPendingTransactionRequest.Gateway,
-			addPendingTransactionRequest.Name,
-		),
-		nonce, 0, state.TX_TYPE_001,
+		server.node.miner, addPendingTransactionRequest.Topic, nonce,
 	)
 	signedTx, err := wallet.SignTxWithKeystoreAccount(
 		tx, server.node.miner, "test", wallet.GetKeystoreDirPath(server.node.datadir))
@@ -93,7 +90,7 @@ func (server publicNodeServer) AddTransaction(
 	}
 	server.node.AddPendingTX(signedTx)
 	server.node.newPendingTXs <- signedTx
-	return &pb.AddPendingPublishCIDTransactionResponse{}, nil
+	return &pb.AddPendingTransactionResponse{}, nil
 }
 
 // // TODO for now this is only the publish cid tx... will generalize later
@@ -115,7 +112,7 @@ func (server publicNodeServer) AddTransaction(
 // 	return nil
 // }
 
-func newNodeServer(n *Node) publicNodeServer {
-	nodeServer := publicNodeServer{node: n}
+func newNodeServer(n *Node) nodeServer {
+	nodeServer := nodeServer{node: n}
 	return nodeServer
 }

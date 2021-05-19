@@ -3,8 +3,8 @@ package node
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
-	"github.com/driemworks/mercury-blockchain/state"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
@@ -17,7 +17,7 @@ const NEW_BLOCKS_TOPIC = "NEW_BLOCKS_TOPIC"
 // messages are pushed to the Messages channel.
 type Channel struct {
 	// A channel of signed transactions to send new pending transactions to peers
-	data      chan map[string]interface{}
+	Data      chan map[string]interface{}
 	topicName string
 	ctx       context.Context
 	ps        *pubsub.PubSub
@@ -41,7 +41,7 @@ func InitChannel(ctx context.Context, topicName string, bufSize int, ps *pubsub.
 		topic: topic,
 		sub:   sub,
 		self:  selfID,
-		data:  make(chan map[string]interface{}, bufSize),
+		Data:  make(chan map[string]interface{}, bufSize),
 	}
 	// start reading messages from the subscription in a loop
 	go ch.readLoop()
@@ -49,8 +49,8 @@ func InitChannel(ctx context.Context, topicName string, bufSize int, ps *pubsub.
 }
 
 // Publish sends a message to the pubsub topic.
-func (cr *Channel) Publish(tx *state.SignedTx) error {
-	msgBytes, err := json.Marshal(tx)
+func (cr *Channel) Publish(msg map[string]interface{}) error {
+	msgBytes, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
@@ -66,7 +66,8 @@ func (cr *Channel) readLoop() {
 	for {
 		msg, err := cr.sub.Next(cr.ctx)
 		if err != nil {
-			close(cr.data)
+			fmt.Println(err)
+			close(cr.Data)
 			return
 		}
 		// only forward messages delivered by others
@@ -76,9 +77,10 @@ func (cr *Channel) readLoop() {
 		cm := new(map[string]interface{})
 		err = json.Unmarshal(msg.Data, cm)
 		if err != nil {
+			fmt.Println(err)
 			continue
 		}
 		// send valid txs to data chan
-		cr.data <- *cm
+		cr.Data <- *cm
 	}
 }
