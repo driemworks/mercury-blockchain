@@ -2,34 +2,29 @@ syntax = "proto3";
 package proto;
 option go_package = "./";
 
-service PublicNode  {
+service NodeService  {
     // Obtains a node's name
     rpc GetNodeStatus(NodeInfoRequest) returns (NodeInfoResponse) {}
-    // read/write to known peers
-    rpc ListKnownPeers(ListKnownPeersRequest) returns (stream ListKnownPeersResponse) {}
-    // TODO: Authentication
-    rpc JoinKnownPeers(JoinKnownPeersRequest) returns (JoinKnownPeersResponse) {}
-    // read/write blocks 
-    rpc ListBlocks(ListBlocksRequest) returns (stream BlockResponse) {}
+    // // read/write to known peers
+    // rpc ListKnownPeers(ListKnownPeersRequest) returns (stream ListKnownPeersResponse) {}
+    // // read/write blocks 
+    // rpc ListBlocks(ListBlocksRequest) returns (stream BlockResponse) {}
     // add pending transaction
-    rpc AddPendingPublishCIDTransaction(AddPendingPublishCIDTransactionRequest) returns (AddPendingPublishCIDTransactionResponse) {}
+    rpc AddTransaction(AddPendingTransactionRequest) returns (AddPendingTransactionResponse) {}
     // list pending transactions
-    rpc ListPendingTransactions(ListPendingTransactionsRequest) returns (stream PendingTransactionResponse) {}
+    // rpc ListTransactions(ListPendingTransactionsRequest) returns (stream PendingTransactionResponse) {}
 }
 
 message ListPendingTransactionsRequest {}
 message PendingTransactionResponse {
     bytes signedTx = 1;
 }
-// Q: Do I need a different request for each tx type? yes... unless I can use a bytes type and marshal/unmarshal correctly
-message AddPendingPublishCIDTransactionRequest {
-    string toAddress = 3;
-    string cid = 4;
-    string gateway = 5;
-    string name = 6;
+
+message AddPendingTransactionRequest {
+    string topic = 1;
 }
 
-message AddPendingPublishCIDTransactionResponse { }
+message AddPendingTransactionResponse { }
 
 message ListBlocksRequest {
     string fromBlock = 1;
@@ -45,20 +40,6 @@ message BlockHeaderMessage {
     string miner = 5;
     int32 pow = 6;
 }
-message SignedTransactionMessage {
-    Transaction tx = 1;
-    bytes sig  = 2;
-}
-message Transaction {}
-
-message JoinKnownPeersRequest {
-    string name = 1;
-    string ip = 2;
-    uint64 port = 3;
-    string address = 4;
-    bool isBootstrap = 5;
-}
-message JoinKnownPeersResponse  {}
 
 message ListKnownPeersRequest {}
 
@@ -74,8 +55,7 @@ message NodeInfoRequest { }
 
 message NodeInfoResponse {
     string address = 1;
-    string name = 2;
-    float balance = 3;
-    string hash = 4;
-    uint64 number = 5;
+    float balance = 2;
+    repeated string subscriptions = 3;
+    repeated string channels = 4;
 }

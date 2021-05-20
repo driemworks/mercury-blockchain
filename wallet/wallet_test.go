@@ -160,8 +160,7 @@ func TestSignForgedTxWithKeystoreAccount(t *testing.T) {
 		return
 	}
 
-	forgedTx := state.NewTx(babaYaga, hacker,
-		state.NewCID("", "", ""), 1, 1, state.TX_TYPE_001)
+	forgedTx := state.NewTx(babaYaga, "Test", 1, 1)
 
 	signedTx, err := SignTxWithKeystoreAccount(forgedTx, hacker, testKeystoreAccountsPwd, GetKeystoreDirPath(tmpDir))
 	if err != nil {

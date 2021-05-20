@@ -11,7 +11,7 @@ var genesisJson = `
 {
     "genesis_time": "2021-02-012T00:00:00.000000000Z",
     "chain_id": "driemworks-blockchain",
-    "manifest": {
+    "state": {
         "0x96131b31b9935f6388502b502cf544c1a8c65ad6": {
 			"alias": "tony",
             "sent": [],
@@ -23,7 +23,7 @@ var genesisJson = `
 }`
 
 type Genesis struct {
-	Manifest map[common.Address]CurrentNodeState `json: "manifest"`
+	State map[common.Address]CurrentNodeState `json:"state"`
 }
 
 func loadGenesis(filepath string) (Genesis, error) {

@@ -16,37 +16,15 @@ import (
 
 const BlockReward = float32(10)
 
-// TODO used as both a request and response... maybe move to common?
-type CID struct {
-	CID         string `json:"cid"`
-	IPFSGateway string `json:"ipfs_gateway"`
-	Name        string `json:"name"`
-}
-
-type SentItem struct {
-	To     common.Address `json:"to"`
-	CID    CID            `json:"cid"`
-	Hash   Hash           `json:"hash"`
-	Amount float32        `json:"amount"`
-}
-
-type InboxItem struct {
-	From   common.Address `json:"from"`
-	CID    CID            `json:"cid"`
-	Hash   Hash           `json:"hash"`
-	Amount float32        `json:"amount"`
-}
-
 type CurrentNodeState struct {
-	Sent           []SentItem      `json:"sent"`
-	Inbox          []InboxItem     `json:"inbox"`
-	Balance        float32         `json:"balance"`
-	PendingBalance float32         `json:"pending_balance"`
-	TrustedPeers   []core.PeerNode `json:"trusted_peers"`
+	Subscriptions  [][]byte `json:"subscriptions"`
+	Channels       [][]byte `json:"channels"`
+	Balance        float32  `json:"balance"`
+	PendingBalance float32  `json:"pending_balance"`
 }
 
 type State struct {
-	Manifest             map[common.Address]CurrentNodeState
+	Catalog              map[common.Address]CurrentNodeState
 	Account2Nonce        map[common.Address]uint
 	PendingAccount2Nonce map[common.Address]uint
 	txMempool            []Tx
@@ -73,8 +51,8 @@ func NewStateFromDisk(datadir string) (*State, error) {
 	// load the manifest -> consider refactoring name..
 	// using manifest as var and Manifest as type, but they are not the same thing
 	manifest := make(map[common.Address]CurrentNodeState)
-	for account, mailbox := range gen.Manifest {
-		manifest[account] = CurrentNodeState{mailbox.Sent, mailbox.Inbox, mailbox.Balance, mailbox.PendingBalance, mailbox.TrustedPeers}
+	for account, s := range gen.State {
+		manifest[account] = CurrentNodeState{s.Subscriptions, s.Channels, s.Balance, s.PendingBalance}
 	}
 
 	blockDbFile, err := os.OpenFile(getBlocksDbFilePath(datadir, false), os.O_APPEND|os.O_RDWR, 0600)
@@ -170,7 +148,7 @@ func (s *State) AddBlock(b Block) (*State, Hash, error) {
 	}
 
 	s.Account2Nonce = pendingState.Account2Nonce
-	s.Manifest = pendingState.Manifest
+	s.Catalog = pendingState.Catalog
 	s.latestBlockHash = blockHash
 	s.latestBlock = b
 	s.hasGenesisBlock = true
@@ -197,10 +175,10 @@ func ApplyBlock(b Block, s *State) error {
 	if err != nil {
 		return err
 	}
-	tmp := s.Manifest[b.Header.Miner]
+	tmp := s.Catalog[b.Header.Miner]
 	tmp.Balance += BlockReward
 	tmp.PendingBalance += BlockReward
-	s.Manifest[b.Header.Miner] = tmp
+	s.Catalog[b.Header.Miner] = tmp
 
 	return nil
 }
@@ -294,8 +272,6 @@ func applyTXs(txs []SignedTx, s *State) error {
 
 /*
 * apply the transaction to the current state
-* 1) appends a sent item to the tx's from account
-* 2) appends an inbox item to t he tx's to account
  */
 func applyTx(tx SignedTx, s *State) error {
 	ok, err := tx.IsAuthentic()
@@ -304,9 +280,9 @@ func applyTx(tx SignedTx, s *State) error {
 	}
 
 	if !ok {
-		return fmt.Errorf("bad Tx. Sender '%s' is forged", tx.From.String())
+		return fmt.Errorf("bad Tx. Sender '%s' is forged", tx.Author.String())
 	}
-	expectedNonce := s.Account2Nonce[tx.From] + 1
+	expectedNonce := s.Account2Nonce[tx.Author] + 1
 	if tx.Nonce != expectedNonce {
 		// this is a possible case of another miner mining the same block!
 		return fmt.Errorf("bad Tx. next nonce must be '%d', not '%d'", expectedNonce, tx.Nonce)
@@ -316,12 +292,25 @@ func applyTx(tx SignedTx, s *State) error {
 	// 	return fmt.Errorf("bad Tx. You have no remaining balance")
 	// }
 
-	txHash, err := tx.Hash()
+	_, err = tx.Hash()
 	if err != nil {
 		return fmt.Errorf("bad Tx. Can't calculate tx hash")
 	}
+	// topic := tx.Topic
+	// clone the state
+	// var senderMailbox = s.Manifest[tx.From]
+	// senderMailbox.Sent = append(senderMailbox.Sent, SentItem{tx.To, cid, txHash, tx.Amount})
+	// senderMailbox.Balance = senderMailbox.PendingBalance
+	// s.Manifest[tx.From] = senderMailbox
+	var currentNodeState = s.Catalog[tx.Author]
+	// for now, just assume topic creation only?
+	currentNodeState.Channels = append(currentNodeState.Channels, []byte(tx.Topic))
+	// TODO: assume for now that topic creation costs 1 coin
+	currentNodeState.Balance = currentNodeState.Balance - 1
+	s.Catalog[tx.Author] = currentNodeState
+
 	// could ignore transactions that aren't mine?
-	cid := tx.Payload
+	// cid := tx.Payload
 	// the below will update the state based on the transaction type
 	// if tx.Type == TX_TYPE_001 {
 	// map the payload to a CID
@@ -336,15 +325,15 @@ func applyTx(tx SignedTx, s *State) error {
 	// default:
 	// 	cid = payload.Value.(CID)
 	// }
-	var senderMailbox = s.Manifest[tx.From]
-	senderMailbox.Sent = append(senderMailbox.Sent, SentItem{tx.To, cid, txHash, tx.Amount})
-	senderMailbox.Balance = senderMailbox.PendingBalance
-	s.Manifest[tx.From] = senderMailbox
+	// var senderMailbox = s.Manifest[tx.From]
+	// senderMailbox.Sent = append(senderMailbox.Sent, SentItem{tx.To, cid, txHash, tx.Amount})
+	// senderMailbox.Balance = senderMailbox.PendingBalance
+	// s.Manifest[tx.From] = senderMailbox
 	// update recipient inbox items
-	var receipientMailbox = s.Manifest[tx.To]
-	receipientMailbox.Balance += tx.Amount
-	receipientMailbox.Inbox = append(receipientMailbox.Inbox, InboxItem{tx.From, cid, txHash, tx.Amount})
-	s.Manifest[tx.To] = receipientMailbox
+	// var receipientMailbox = s.Manifest[tx.To]
+	// receipientMailbox.Balance += tx.Amount
+	// receipientMailbox.Inbox = append(receipientMailbox.Inbox, InboxItem{tx.From, cid, txHash, tx.Amount})
+	// s.Manifest[tx.To] = receipientMailbox
 	// s.Account2Nonce[tx.From] = tx.Nonce
 	// } else if tx.Type == TX_TYPE_002 {
 	// 	fmt.Println("Adding trusted peer from transaction")
@@ -369,16 +358,8 @@ func applyTx(tx SignedTx, s *State) error {
 	// 	trustedPeersClone.TrustedPeers = append(s.Manifest[tx.From].TrustedPeers, peerNode)
 	// 	s.Manifest[tx.From] = trustedPeersClone
 	// }
-	s.Account2Nonce[tx.From] = tx.Nonce
+	s.Account2Nonce[tx.Author] = tx.Nonce
 	return nil
-}
-
-func (c *CID) IsEmpty() bool {
-	return len(c.CID) == 0
-}
-
-func NewCID(cid string, gateway string, name string) CID {
-	return CID{cid, gateway, name}
 }
 
 /*
@@ -412,10 +393,10 @@ func (s *State) copy() State {
 	copy.latestBlock = s.latestBlock
 	copy.latestBlockHash = s.latestBlockHash
 	copy.txMempool = make([]Tx, len(s.txMempool))
-	copy.Manifest = make(map[common.Address]CurrentNodeState)
+	copy.Catalog = make(map[common.Address]CurrentNodeState)
 	copy.Account2Nonce = make(map[common.Address]uint)
-	for account, manifest := range s.Manifest {
-		copy.Manifest[account] = manifest
+	for account, manifest := range s.Catalog {
+		copy.Catalog[account] = manifest
 	}
 	for account, nonce := range s.Account2Nonce {
 		copy.Account2Nonce[account] = nonce

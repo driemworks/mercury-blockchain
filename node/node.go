@@ -2,163 +2,68 @@ package node
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"log"
-	"net"
 	"time"
 
 	"github.com/driemworks/mercury-blockchain/core"
-	pb "github.com/driemworks/mercury-blockchain/proto"
 	"github.com/driemworks/mercury-blockchain/state"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/reflection"
-
 	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/raphamorim/go-rainbow"
 )
 
 const miningIntervalSeconds = 45
-const syncIntervalSeconds = 30
 
 type Node struct {
-	password        string
 	datadir         string
 	ip              string
 	port            uint64
+	miner           common.Address
 	state           *state.State
-	info            core.PeerNode
-	knownPeers      map[string]core.PeerNode
-	trustedPeers    map[string]core.PeerNode
 	pendingTXs      map[string]state.SignedTx
 	archivedTXs     map[string]state.SignedTx
-	newSyncedBlocks chan state.Block    // TODO -> needed?
-	newPendingTXs   chan state.SignedTx // TODO -> needed?
+	newSyncedBlocks chan state.Block
+	newMinedBlocks  chan state.Block
+	newPendingTXs   chan state.SignedTx
 	isMining        bool
 	name            string
 	tls             bool
+	host            host.Host
 }
 
-func NewNode(name string, datadir string, ip string, port uint64,
-	address common.Address, bootstrap core.PeerNode, password string, tls bool) *Node {
-	knownPeers := make(map[string]core.PeerNode)
-	knownPeers[bootstrap.TcpAddress()] = bootstrap
+func NewNode(name string, datadir string, miner string, ip string, port uint64, tls bool) *Node {
+	minerAddress := state.NewAddress(miner)
 	return &Node{
 		name:            name,
 		datadir:         datadir,
+		miner:           minerAddress,
 		ip:              ip,
 		port:            port,
-		knownPeers:      knownPeers,
-		trustedPeers:    make(map[string]core.PeerNode),
-		info:            core.NewPeerNode(name, ip, port, false, address, true),
 		pendingTXs:      make(map[string]state.SignedTx),
 		archivedTXs:     make(map[string]state.SignedTx),
 		newSyncedBlocks: make(chan state.Block),
+		newMinedBlocks:  make(chan state.Block),
 		newPendingTXs:   make(chan state.SignedTx, 10000),
 		isMining:        false,
-		password:        password, // TODO this is temporary
 		tls:             tls,
 	}
 }
 
-/**
-Run an RPC server to serve the implementation of the NodeServer
-*/
-func (n *Node) RunRPCServer(tls bool, certFile string, keyFile string) error {
-	// start the server
-	var opts []grpc.ServerOption
-	if tls {
-		tlsCredentials, err := loadTLSCredentials_Server()
-		if err != nil {
-			return err
-		}
-		opts = []grpc.ServerOption{grpc.Creds(tlsCredentials)}
-	}
-	grpcServer := grpc.NewServer(opts...)
-	pb.RegisterPublicNodeServer(grpcServer, newNodeServer(n))
-	reflection.Register(grpcServer) // must register reflection api in order to invoke rpc externally
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", n.ip, n.port))
-	// TODO expose this ip:port when DNS service built out?
-	if err != nil {
-		fmt.Printf("Could not listen on %s:%d", n.ip, n.port)
-	}
-	fmt.Println(fmt.Sprintf("Listening on: %s:%d", n.ip, n.port))
-	err = grpcServer.Serve(lis)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func loadTLSCredentials_Server() (credentials.TransportCredentials, error) {
-	serverCert, err := tls.LoadX509KeyPair("resources/cert/server-cert.pem", "resources/cert/server-key.pem")
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	config := &tls.Config{
-		Certificates: []tls.Certificate{serverCert},
-		ClientAuth:   tls.NoClientCert,
-	}
-	return credentials.NewTLS(config), nil
-}
-
-func loadTLSCredentials_Client() (credentials.TransportCredentials, error) {
-	pemServerCA, err := ioutil.ReadFile("resources/cert/ca-cert.pem")
-	if err != nil {
-		return nil, err
-	}
-	certPool := x509.NewCertPool()
-	if !certPool.AppendCertsFromPEM(pemServerCA) {
-		return nil, fmt.Errorf("failed to add server CA's certificate")
-	}
-	config := &tls.Config{
-		RootCAs: certPool,
-	}
-	return credentials.NewTLS(config), nil
-}
-
-func RunRPCClient(ctx context.Context, tcp string, tls bool, caFile string, serverHostOverride string) (pb.PublicNodeClient, error) {
-	var opts []grpc.DialOption
-	if tls {
-		tlsCreds, err := loadTLSCredentials_Client()
-		if err != nil {
-			log.Fatalf("cannot load TLS credentials: %s", err)
-		}
-		// NOTE: can add interceptors to add auth headers!
-		opts = append(opts, grpc.WithTransportCredentials(tlsCreds))
-	} else {
-		opts = append(opts, grpc.WithInsecure())
-	}
-
-	opts = append(opts, grpc.WithBlock())
-	conn, err := grpc.Dial(tcp, opts...)
-	if err != nil {
-		log.Fatalf("fail to dial: %v", err)
-		return nil, err
-	}
-	go func() {
-		<-ctx.Done()
-		_ = conn.Close()
-	}()
-	return pb.NewPublicNodeClient(conn), nil
-}
-
-func (n *Node) Run_RPC(ctx context.Context) error {
-	// load the state
+func (n *Node) Run(ctx context.Context, port int, peer string, name string) error {
 	state, err := state.NewStateFromDisk(n.datadir)
 	if err != nil {
 		return err
 	}
 	defer state.Close()
 	n.state = state
-	go n.sync(ctx)
+	go n.runRPCServer("", "")
 	go n.mine(ctx)
-	n.RunRPCServer(n.tls, "", "")
+	err = n.runLibp2pNode(ctx, port, peer, name)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -205,7 +110,7 @@ func (n *Node) minePendingTXs(ctx context.Context) error {
 	blockToMine := NewPendingBlock(
 		n.state.LatestBlockHash(),
 		n.state.NextBlockNumber(),
-		n.info.Address,
+		n.miner,
 		n.getPendingTXsAsArray(),
 	)
 	minedBlock, err := Mine(ctx, blockToMine)
@@ -215,6 +120,7 @@ func (n *Node) minePendingTXs(ctx context.Context) error {
 
 	n.removeMinedPendingTXs(minedBlock)
 	_, _, err = n.state.AddBlock(minedBlock)
+	n.newMinedBlocks <- minedBlock
 	if err != nil {
 		return err
 	}
@@ -235,24 +141,6 @@ func (n *Node) removeMinedPendingTXs(block state.Block) {
 			delete(n.pendingTXs, txHash.Hex())
 		}
 	}
-}
-
-func (n *Node) AddPeer(peer core.PeerNode) {
-	n.knownPeers[peer.TcpAddress()] = peer
-}
-
-func (n *Node) RemovePeer(peer core.PeerNode) {
-	delete(n.knownPeers, peer.TcpAddress())
-}
-
-func (n *Node) IsKnownPeer(peer core.PeerNode) bool {
-	if peer.IP == n.info.IP && peer.Port == n.info.Port {
-		return true
-	}
-
-	_, isKnownPeer := n.knownPeers[peer.TcpAddress()]
-
-	return isKnownPeer
 }
 
 /**
@@ -278,36 +166,16 @@ func (n *Node) AddPendingTX(tx state.SignedTx) error {
 		}
 
 		fmt.Printf("Adding pending transactions: \n%s\n", &prettyTxJSON)
-
+		tmpFrom := n.state.Catalog[tx.Author]
+		if tmpFrom.Balance <= 0 {
+			// for now...
+			tmpFrom.Balance = 10
+			// return fmt.Errorf("Insufficient balance")
+		}
+		tmpFrom.Balance -= 1
 		n.pendingTXs[txHash.Hex()] = tx
-		n.newPendingTXs <- tx
-		tmpFrom := n.state.Manifest[tx.From]
-		if tmpFrom.Sent == nil {
-			tmpFrom.Inbox = make([]state.InboxItem, 0)
-			tmpFrom.Sent = make([]state.SentItem, 0)
-			// uncomment the below in order to automatically reward new addresses
-			// tmpFrom.Balance += manifest.BlockReward
-			// tmpFrom.PendingBalance += tmpFrom.Balance
-		}
-		// TODO - the cost of the transaction is one coin for now, but should this always be the case?
-		//         could file size factor into the cost? -> maybe when I get to the concept of gas?
-		if tx.Amount > 0 {
-			tmpFrom.PendingBalance -= tx.Amount
-		}
-		n.state.Manifest[tx.From] = tmpFrom
-		// increase the account to nonce value => allows us to support mining blocks with multiple transactions
-		n.state.PendingAccount2Nonce[tx.From]++
-		tmpTo := n.state.Manifest[tx.To]
-		// needed?
-		if tmpTo.Inbox == nil {
-			tmpTo.Sent = make([]state.SentItem, 0)
-			tmpTo.Inbox = make([]state.InboxItem, 0)
-			// uncomment the below in order to automatically reward new addresses
-			// tmpTo.Balance += manifest.BlockReward
-			// tmpTo.PendingBalance += tmpTo.Balance
-		}
-		tmpTo.PendingBalance += tx.Amount
-		n.state.Manifest[tx.To] = tmpTo
+		n.state.Catalog[tx.Author] = tmpFrom
+		n.state.PendingAccount2Nonce[tx.Author]++
 	}
 	return nil
 }

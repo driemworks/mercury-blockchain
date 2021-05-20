@@ -6,16 +6,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/driemworks/mercury-blockchain/core"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-)
-
-// these constants directly correlate to user actions
-const (
-	TX_TYPE_001 = "PUBLISH"    // publish a cid to the network
-	TX_TYPE_002 = "TRUST_PEER" // add a peer to the trusted peers
 )
 
 func NewAddress(value string) common.Address {
@@ -23,32 +15,10 @@ func NewAddress(value string) common.Address {
 }
 
 type Tx struct {
-	From    common.Address `json:"from"`
-	To      common.Address `json:"to"`
-	Payload CID            `json:"payload"`
-	Nonce   uint           `json:"nonce"`
-	Time    uint64         `json:"time"`
-	Amount  float32        `json:"amount"`
-}
-
-// type TransactionPayload struct {
-// 	// Value interface{}
-// 	cid CID
-// }
-
-func NewTrustPeerTransactionPayload(pn core.PeerNode) TrustPeerTransactionPayload {
-	return TrustPeerTransactionPayload{
-		pn.Address, pn.IP, pn.IsBootstrap, pn.Name, pn.Port,
-	}
-}
-
-// everything in PeerNode except the Connected field
-type TrustPeerTransactionPayload struct {
-	Address     common.Address `json:"address"`
-	IP          string         `json:"ip"`
-	IsBootstrap bool           `json:"is_bootstrap"`
-	Name        string         `json:"name"`
-	Port        uint64         `json:"port"`
+	Author common.Address `json:"author"`
+	Topic  string         `json:"topic"`
+	Nonce  uint           `json:"nonce"`
+	Time   uint64         `json:"time"`
 }
 
 type SignedTx struct {
@@ -56,8 +26,8 @@ type SignedTx struct {
 	Sig []byte `json:"signature"`
 }
 
-func NewTx(from common.Address, to common.Address, payload CID, nonce uint, amount float32, txType string) Tx {
-	return Tx{from, to, payload, nonce, uint64(time.Now().Unix()), amount}
+func NewTx(from common.Address, topic string, nonce uint) Tx {
+	return Tx{from, topic, nonce, uint64(time.Now().Unix())}
 }
 
 func NewSignedTx(tx Tx, sig []byte) SignedTx {
@@ -92,5 +62,5 @@ func (t SignedTx) IsAuthentic() (bool, error) {
 	recoveredPubKeyBytesHash := crypto.Keccak256(recoveredPubKeyBytes[1:])
 	recoveredAccount := common.BytesToAddress(recoveredPubKeyBytesHash[12:])
 
-	return recoveredAccount.Hex() == t.From.Hex(), nil
+	return recoveredAccount.Hex() == t.Author.Hex(), nil
 }
