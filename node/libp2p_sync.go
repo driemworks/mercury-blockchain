@@ -1,6 +1,7 @@
 package node
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -101,23 +102,47 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 	}
 	defer kademliaDHT.Close()
 	// add bootstrap nodes if provided
-	addPeers(ctx, *n, kademliaDHT, bootstrapPeer, true)
-	log.Printf("Listening on %v (Protocols: %v)", host.Addrs(), host.Mux().Protocols())
-	var ps *pubsub.PubSub
 	if bootstrapPeer == "" {
-		host.SetStreamHandler(DiscoveryServiceTag, func(s network.Stream) {
-			// TODO this is pretty bad...
-			addPeers(ctx, *n, kademliaDHT, s.Conn().RemoteMultiaddr().String()+"/p2p/"+s.Conn().RemotePeer().String(), false)
-		})
 		// TODO leaving as localhost for now. Should this be configurable?
 		bootstrapPeer = fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", port, host.ID().Pretty())
+	} else {
+		addPeers(ctx, *n, kademliaDHT, bootstrapPeer, true)
 	}
+
+	log.Printf("Listening on %v (Protocols: %v)", host.Addrs(), host.Mux().Protocols())
+	host.SetStreamHandler(pubsub.RemoteTracerProtoID, func(s network.Stream) {
+		// called when peer connects only?? verify this...
+		s, err := host.NewStream(ctx, s.Conn().RemotePeer(), "PENDING_TX_SYNC")
+		if err != nil {
+			log.Fatalln(err)
+		}
+		pendingJson, err := json.Marshal(n.pendingTXs)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		pendingJson = append(pendingJson, '\n')
+		s.Write(pendingJson)
+	})
+	host.SetStreamHandler("PENDING_TX_SYNC", func(s network.Stream) {
+		buf := bufio.NewReader(s)
+		bytes, err := buf.ReadBytes('\n')
+		if err != nil {
+			log.Fatalln(err)
+		}
+		var txs map[string]state.SignedTx
+		err = json.Unmarshal(bytes, &txs)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		n.pendingTXs = txs
+	})
 	peerinfo, err := peer.AddrInfoFromP2pAddr(multiaddr.StringCast(bootstrapPeer))
 	tracer, err := pubsub.NewRemoteTracer(ctx, host, *peerinfo)
 	if err != nil {
 		panic(err)
 	}
 	// create a pubsub service using the GossipSub router
+	var ps *pubsub.PubSub
 	ps, err = pubsub.NewGossipSub(ctx, host, pubsub.WithEventTracer(tracer))
 	if err != nil {
 		log.Fatalln(err)
@@ -126,6 +151,7 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 	new_block_cr, err := JoinNewBlockExchange(ctx, ps, host.ID())
 	for {
 		select {
+		// youre reading a tx from the stream
 		case data := <-pending_tx_channel.Data:
 			txMap := data["Tx"]
 			bytes, err := json.Marshal(txMap)
@@ -141,6 +167,9 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 			sig, _ := base64.RawStdEncoding.DecodeString(sig_string)
 			signedTx := state.NewSignedTx(tx, sig)
 			n.AddPendingTX(signedTx)
+			//add to dht... how to clear?
+			kademliaDHT.PutValue(ctx, "PENDING_TXS", bytes)
+		// youre writing txs to the stream
 		case tx := <-n.newPendingTXs:
 			txMap := structs.Map(tx)
 			pending_tx_channel.Publish(txMap)

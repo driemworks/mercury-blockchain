@@ -16,8 +16,7 @@ const flagPort = "port"
 const flagMiner = "miner"
 const flagName = "name"
 const flagKeystoreFile = "keystore"
-const flagBootstrapIP = "bootstrap-ip"
-const flagBootstrapPort = "bootstrap"
+const flagBootstrap = "bootstrap"
 const flagTls = "tls"
 
 func main() {

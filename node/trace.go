@@ -1,114 +1,116 @@
 package node
 
-import (
-	"compress/gzip"
-	"fmt"
-	"io"
-	"os"
-	"sync"
+// import (
+// 	"compress/gzip"
+// 	"encoding/json"
+// 	"fmt"
+// 	"io"
+// 	"os"
+// 	"sync"
+// 	"time"
 
-	ggio "github.com/gogo/protobuf/io"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	pb "github.com/libp2p/go-libp2p-pubsub/pb"
-)
+// 	ggio "github.com/gogo/protobuf/io"
+// 	"github.com/libp2p/go-libp2p-core/host"
+// 	"github.com/libp2p/go-libp2p-core/network"
+// 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+// 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
+// )
 
-type TraceCollector struct {
-	host      host.Host
-	dir       string
-	jsonTrace string
+// type TraceCollector struct {
+// 	host      host.Host
+// 	dir       string
+// 	jsonTrace string
 
-	mx  sync.Mutex
-	buf []*pb.TraceEvent
+// 	mx  sync.Mutex
+// 	buf []*pb.TraceEvent
 
-	notifyWriteCh chan struct{}
-	flushFileCh   chan struct{}
-	exitCh        chan struct{}
-	doneCh        chan struct{}
-}
+// 	notifyWriteCh chan struct{}
+// 	flushFileCh   chan struct{}
+// 	exitCh        chan struct{}
+// 	doneCh        chan struct{}
+// }
 
-// NewTraceCollector creates a new pubsub traces collector. A collector is a process
-// that listens on a libp2p endpoint, accepts pubsub tracing streams from peers,
-// and records the incoming data into rotating gzip files.
-// If the json argument is not empty, then every time a new trace is generated, it will be written
-// to this directory in json format for online processing.
-func NewTraceCollector(host host.Host, dir, jsonTrace string) (*TraceCollector, error) {
-	err := os.MkdirAll(dir, 0755)
-	if err != nil {
-		return nil, err
-	}
+// // NewTraceCollector creates a new pubsub traces collector. A collector is a process
+// // that listens on a libp2p endpoint, accepts pubsub tracing streams from peers,
+// // and records the incoming data into rotating gzip files.
+// // If the json argument is not empty, then every time a new trace is generated, it will be written
+// // to this directory in json format for online processing.
+// func NewTraceCollector(host host.Host, dir, jsonTrace string) (*TraceCollector, error) {
+// 	err := os.MkdirAll(dir, 0755)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	c := &TraceCollector{
-		host:          host,
-		dir:           dir,
-		jsonTrace:     jsonTrace,
-		notifyWriteCh: make(chan struct{}, 1),
-		flushFileCh:   make(chan struct{}, 1),
-		exitCh:        make(chan struct{}, 1),
-		doneCh:        make(chan struct{}, 1),
-	}
+// 	c := &TraceCollector{
+// 		host:          host,
+// 		dir:           dir,
+// 		jsonTrace:     jsonTrace,
+// 		notifyWriteCh: make(chan struct{}, 1),
+// 		flushFileCh:   make(chan struct{}, 1),
+// 		exitCh:        make(chan struct{}, 1),
+// 		doneCh:        make(chan struct{}, 1),
+// 	}
 
-	host.SetStreamHandler(pubsub.RemoteTracerProtoID, c.handleStream)
+// 	host.SetStreamHandler(pubsub.RemoteTracerProtoID, c.handleStream)
 
-	// go c.collectWorker()
-	// go c.monitorWorker()
+// 	// go c.collectWorker()
+// 	// go c.monitorWorker()
 
-	return c, nil
-}
+// 	return c, nil
+// }
 
-// Stop stops the collector.
-func (tc *TraceCollector) Stop() {
-	close(tc.exitCh)
-	tc.flushFileCh <- struct{}{}
-	<-tc.doneCh
-}
+// // Stop stops the collector.
+// func (tc *TraceCollector) Stop() {
+// 	close(tc.exitCh)
+// 	tc.flushFileCh <- struct{}{}
+// 	<-tc.doneCh
+// }
 
-// Flush flushes and rotates the current file.
-func (tc *TraceCollector) Flush() {
-	tc.flushFileCh <- struct{}{}
-}
+// // Flush flushes and rotates the current file.
+// func (tc *TraceCollector) Flush() {
+// 	tc.flushFileCh <- struct{}{}
+// }
 
-// handleStream accepts an incoming tracing stream and drains it into the
-// buffer, until the stream is closed or an error occurs.
-func (tc *TraceCollector) handleStream(s network.Stream) {
-	defer s.Close()
+// // handleStream accepts an incoming tracing stream and drains it into the
+// // buffer, until the stream is closed or an error occurs.
+// func (tc *TraceCollector) handleStream(s network.Stream) {
+// 	defer s.Close()
 
-	fmt.Printf("new stream from", s.Conn().RemotePeer())
+// 	fmt.Printf("new stream from", s.Conn().RemotePeer())
 
-	gzipR, err := gzip.NewReader(s)
-	if err != nil {
-		fmt.Printf("error opening compressed stream from %s: %s\n", s.Conn().RemotePeer(), err)
-		s.Reset()
-		return
-	}
+// 	gzipR, err := gzip.NewReader(s)
+// 	if err != nil {
+// 		fmt.Printf("error opening compressed stream from %s: %s\n", s.Conn().RemotePeer(), err)
+// 		s.Reset()
+// 		return
+// 	}
 
-	r := ggio.NewDelimitedReader(gzipR, 1<<22)
-	var msg pb.TraceEventBatch
+// 	r := ggio.NewDelimitedReader(gzipR, 1<<22)
+// 	var msg pb.TraceEventBatch
 
-	for {
-		msg.Reset()
+// 	for {
+// 		msg.Reset()
 
-		switch err = r.ReadMsg(&msg); err {
-		case nil:
-			tc.mx.Lock()
-			tc.buf = append(tc.buf, msg.Batch...)
-			tc.mx.Unlock()
+// 		switch err = r.ReadMsg(&msg); err {
+// 		case nil:
+// 			tc.mx.Lock()
+// 			tc.buf = append(tc.buf, msg.Batch...)
+// 			tc.mx.Unlock()
 
-			select {
-			case tc.notifyWriteCh <- struct{}{}:
-			default:
-			}
+// 			select {
+// 			case tc.notifyWriteCh <- struct{}{}:
+// 			default:
+// 			}
 
-		case io.EOF:
-			return
+// 		case io.EOF:
+// 			return
 
-		default:
-			fmt.Sprintf("error reading batch from %s: %s\n", s.Conn().RemotePeer(), err)
-			return
-		}
-	}
-}
+// 		default:
+// 			fmt.Sprintf("error reading batch from %s: %s\n", s.Conn().RemotePeer(), err)
+// 			return
+// 		}
+// 	}
+// }
 
 // // collectWorker is the main worker. It keeps recording traces into the
 // // `current` file and rotates the file when it's filled.

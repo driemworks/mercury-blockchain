@@ -5,6 +5,7 @@ Mercury is simple a blockchain built on top of libp2p.
 - Enable trace for all topics, read trace when joining topics
 - Replace PoW with more efficient consensus algorithm
 - code cleanup
+- what if I do something like holochain?
 
 ## Getting Started
 ### Introduction
@@ -34,7 +35,7 @@ Note: if you're running linux you may need to set `export GO111MODULE=on;go get 
     -  options:
       - `--name`: (optional) The name of your node - Default: ?
       - `--datadir`: (optional) the directory where local data will be stored - Default: `.mercury`
-      - `--ip`: (optional) the ip addreses of the mercury node - Default: `127.0.0.1`
+      - `--ip`: (optional) the ip addreses of the mercury node - Default: `127.0.01`
       - `--port`: (optional) the port of the mercury node - Default: `8080`
       - `--miner`: (required) the public key to use (see: output of wallet command)
       - `--bootstrap-ip`: (optional) the ip address of the bootdstrap node - Default: `127.0.0.1`
@@ -51,10 +52,10 @@ Note: if you're running linux you may need to set `export GO111MODULE=on;go get 
   mercury wallet new-address --datadir=./.mercury
   >  0x27084384033F90d96c3769e1b4fCE0E5ffff720B
   # start a node using the new address as the miner
-  mercury run --datadir=./.mercury --name=Theo --miner=0x27084384033F90d96c3769e1b4fCE0E5ffff720B --port=8080 --bootstrap-ip=127.0.0.1 --bootstrap-port=8081
+  mercury run --datadir=./.mercury --name=tony --port=8081 --miner=0x27084384033F90d96c3769e1b4fCE0E5ffff720B
   ```
 
-### UI  (Does not work currently - keeping just in case)
+### UI  (Does not work currently - keeping this only for informational purpose)
 There is a crude ui available to interact with your node. Run an ipfs node with `ipfs daemon` and navigate to `http://127.0.0.1:8080/ipfs/Qmc55mmfkrmTyhRRYsaU9d3sDUBbMPXrtExnrwVbuESEAY/build/`
 
 
@@ -101,10 +102,7 @@ Example
 ```
 grpcurl -plaintext -d @ 127.0.0.1:9081 proto.NodeService/AddTransaction <<EOM
 {
-"cid": "Qm...",
-"gateway": "ipfs.io",
-"toAddress": "0xa7ED5257C26Ca5d8aF05FdE04919ce7d4a959147",
-"name": "file.txt"
+    "topic": "test"
 }
 EOM
 
@@ -143,7 +141,6 @@ protoc --go_out=. --go_opt=paths=source_relative \
 
 
 ### Issues
-- TODO: Document any known/in progress issues here
 
 ### Testing
 - example: $ go test ./node/ -test.v -test.run ^TestValidBlockHash$ 
