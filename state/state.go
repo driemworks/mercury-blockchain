@@ -88,40 +88,10 @@ func NewStateFromDisk(datadir string) (*State, error) {
 func (s *State) AddBlock(b Block) (*State, Hash, error) {
 	pendingState := s.copy()
 	latestBlock := s.latestBlock
-	// hash, err := b.Hash()
-	// if err != nil {
-	// 	return s, Hash{}, err
-	// }
 	if s.hasGenesisBlock && b.Header.Number < latestBlock.Header.Number+1 {
-		if s.latestBlock.Header.Number == b.Header.Number {
-			// if s.latestBlockHash == hash {
-			// 	return nil, Hash{}, nil
-			// } else if s.latestBlock.Header.PoW < b.Header.PoW {
-			// 	// orphan your latest block, wait until next sync cycle to get new blocks
-			// 	// could change this, but this is the simplest way to do it
-			// 	// fmt.Println("Another node mined the same block as you, but the proof of work was greater.")
-			// 	// fmt.Println("Rolling back latest block and reclaiming mining reward")
-			// 	// fmt.Println(rainbow.Red("Sorry"))
-			// 	// err = s.orphanLatestBlock()
-			// 	// if err != nil {
-			// 	// 	return nil, Hash{}, err
-			// 	// }
-			// 	// // reset the node's state
-			// 	// pendingState, err := NewStateFromDisk(pendingState.datadir)
-			// 	// if err != nil {
-			// 	// 	return nil, Hash{}, err
-			// 	// }
-			// 	// s = pendingState
-			// 	return nil, Hash{}, nil
-			// 	// return s, Hash{}, fmt.Errorf("ORPHAN BLOCK ENCOUNTERED")
-			// } else {
-			// 	// your block wins... stop mining from this peer
-			// 	// fmt.Println("congrats.. your block wins (greater PoW)")
-			// 	return nil, Hash{}, nil
-			// }
-			return nil, Hash{}, nil
-
-		}
+		// if s.latestBlock.Header.Number == b.Header.Number {
+		return nil, Hash{}, nil
+		// }
 	}
 	err := ApplyBlock(b, &pendingState)
 	if err != nil {
@@ -182,68 +152,6 @@ func ApplyBlock(b Block, s *State) error {
 	tmp.PendingBalance += BlockReward
 	s.Catalog[b.Header.Miner] = tmp
 
-	return nil
-}
-
-func (s *State) orphanLatestBlock() error {
-	latestBlockNumber := s.latestBlock.Header.Number
-	s.Close()
-	// clear the temp file
-	writeEmptyFileToDisk(getBlocksDbFilePath(s.datadir, true))
-	tempDbFile, err := os.OpenFile(getBlocksDbFilePath(s.datadir, true), os.O_APPEND|os.O_RDWR, 0600)
-	blockDbFile, err := os.OpenFile(s.dbFile.Name(), os.O_APPEND|os.O_RDWR, 0600)
-	if err != nil {
-		return err
-	}
-	scanner := bufio.NewScanner(blockDbFile)
-	numBlocks := 0
-	for scanner.Scan() {
-		// handle scanner error
-		if err := scanner.Err(); err != nil {
-			return err
-		}
-		blockFsJSON := scanner.Bytes()
-		if len(blockFsJSON) == 0 {
-			break
-		}
-		var blockFs BlockFS
-		if err := json.Unmarshal(blockFsJSON, &blockFs); err != nil {
-			return err
-		}
-		fmt.Println("WRITING ALL BLOCKS TO BLOCK.DB.TMP.0")
-		tempDbFile.Write(append(blockFsJSON, '\n'))
-		numBlocks = numBlocks + 1 // could probably just use block number for this...
-	}
-	// clear block.db
-	writeEmptyFileToDisk(getBlocksDbFilePath(s.datadir, false))
-	tempDbFile, err = os.OpenFile(getBlocksDbFilePath(s.datadir, true), os.O_APPEND|os.O_RDWR, 0600)
-	tempFileScanner := bufio.NewScanner(tempDbFile)
-	blockToWrite := latestBlockNumber - 1
-	for tempFileScanner.Scan() {
-		// handle scanner error
-		if err = tempFileScanner.Err(); err != nil {
-			return err
-		}
-		blockFsJSON := tempFileScanner.Bytes()
-		if len(blockFsJSON) == 0 {
-			break
-		}
-		var blockFs BlockFS
-		if err = json.Unmarshal(blockFsJSON, &blockFs); err != nil {
-			return err
-		}
-		// if the block's number equals the input block's number, then do nothing
-		// if blockFs.Value.Header.Number < s.latestBlock.Header.Number {
-		if blockToWrite > 0 {
-			fmt.Println("WRITING ALL VALID BLOCKS FROM BLOCK.DB.TMP.0 TO BLOCK.DB")
-			blockDbFile.Write(append(blockFsJSON, '\n'))
-			blockToWrite = blockToWrite - 1
-		}
-		// }
-	}
-	if err != nil {
-		return err
-	}
 	return nil
 }
 

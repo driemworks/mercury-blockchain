@@ -2,7 +2,7 @@
 Mercury is simple a blockchain built on top of go-libp2p. Currently, mercury only allows nodes to "publish" a topic encoded within a transaction, but the intention is achieve something similar to Holochain.
 
 ## TODOS
-- Replace PoW with more efficient consensus algorithm
+- Replace PoW with more efficient consensus algorithm.. proof of contribution?
 - test coverage
 
 ## Getting Started
@@ -14,7 +14,6 @@ TODO
 - install `ipfs` (recommended)
 
 ### Installation 
-
 - Install mercury from the source by cloning this repo and run `go install ./cli/...` from the root directory `mercury-blockchain/`.
 
 

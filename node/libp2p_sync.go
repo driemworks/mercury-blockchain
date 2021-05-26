@@ -17,7 +17,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	noise "github.com/libp2p/go-libp2p-noise"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
@@ -62,9 +61,9 @@ func makeHost(port int, insecure bool) (host.Host, error) {
 
 /*
 	Manually add a peer to the DHT
-	If doRelay = true then opena connection with the peer
+	If doRelay = true then open a connection with the peer
 */
-func addPeers(ctx context.Context, n Node, kad *dht.IpfsDHT, peersArg string, doRelay bool) {
+func addPeers(ctx context.Context, n Node, peersArg string, doRelay bool) {
 	if len(peersArg) == 0 {
 		return
 	}
@@ -72,10 +71,10 @@ func addPeers(ctx context.Context, n Node, kad *dht.IpfsDHT, peersArg string, do
 	for i := 0; i < len(peerStrs); i++ {
 		peerID, peerAddr := MakePeer(peerStrs[i])
 		n.host.Peerstore().AddAddr(peerID, peerAddr, peerstore.PermanentAddrTTL)
-		_, err := kad.RoutingTable().TryAddPeer(peerID, false, false)
-		if err != nil {
-			log.Fatalln(err)
-		}
+		// _, err := kad.RoutingTable().TryAddPeer(peerID, false, false)
+		// if err != nil {
+		// 	log.Fatalln(err)
+		// }
 		// if the peer is already in the DHT, do not call it again
 		if doRelay {
 			peerinfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
@@ -107,17 +106,17 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 		return err
 	}
 	// 1) Start a DHT
-	kademliaDHT, err := dht.New(ctx, host)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer kademliaDHT.Close()
+	// kademliaDHT, err := dht.New(ctx, host)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer kademliaDHT.Close()
 	// add bootstrap nodes if provided
 	if bootstrapPeer == "" {
 		// TODO leaving as localhost for now. Should this be configurable?
 		bootstrapPeer = fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", port, host.ID().Pretty())
 	} else {
-		addPeers(ctx, *n, kademliaDHT, bootstrapPeer, true)
+		addPeers(ctx, *n, bootstrapPeer, true)
 	}
 
 	log.Printf("Listening on %v (Protocols: %v)", host.Addrs(), host.Mux().Protocols())

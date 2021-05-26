@@ -42,7 +42,6 @@ func GetEncryptionKeysFilePath(datadir string) string {
 func initDataDirIfNotExists(dataDir string) error {
 	// if the genesis.json file dne, create it
 	if !fileExists(getGenesisJsonFilePath(dataDir)) {
-		// return nil
 		// create root directory for our db (create parents dirs if needed)
 		// ensure root dir exists
 		if !fileExists(getDatabaseDirPath(dataDir)) {
