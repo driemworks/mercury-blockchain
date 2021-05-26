@@ -1,11 +1,9 @@
 # Mercury Blockchain
-Mercury is simple a blockchain built on top of libp2p.
+Mercury is simple a blockchain built on top of go-libp2p. Currently, mercury only allows nodes to "publish" a topic encoded within a transaction, but the intention is achieve something similar to Holochain.
 
 ## TODOS
-- Enable trace for all topics, read trace when joining topics
 - Replace PoW with more efficient consensus algorithm
-- code cleanup
-- what if I do something like holochain?
+- test coverage
 
 ## Getting Started
 ### Introduction
@@ -33,13 +31,12 @@ Note: if you're running linux you may need to set `export GO111MODULE=on;go get 
   - `help`: Help about any command
   - `run`:  Run the mercury node
     -  options:
-      - `--name`: (optional) The name of your node - Default: ?
+      - `--name`: (optional) The name of your node - Default: `""`
       - `--datadir`: (optional) the directory where local data will be stored - Default: `.mercury`
       - `--ip`: (optional) the ip addreses of the mercury node - Default: `127.0.01`
       - `--port`: (optional) the port of the mercury node - Default: `8080`
       - `--miner`: (required) the public key to use (see: output of wallet command)
-      - `--bootstrap-ip`: (optional) the ip address of the bootdstrap node - Default: `127.0.0.1`
-      - `--bootstrap-port`: (optional) the port of the bootstrap node - Default: `8080`
+      - `--bootstrap`: (optional) Multihash of the peer you want to use as a bootstrap. This will be in the form `/ip4/<peer-ip>/tcp/<peer-port>/p2p/<peer node hash>` - Defaut: `""`
   - `wallet`: Access the node's wallet
     - `new-address` Generate a new address
         -  options:
@@ -65,9 +62,6 @@ Note: The ui is available via pinata, however, due to the crudeness of the UI it
 To connect with the test network, use `--bootstrap-ip=ec2-34-207-242-13.compute-1.amazonaws.com` and `bootstrap-port=8080`
 `mercury run --name=theo --datadir=.mercury/ --miner=0x990DB19D440124F3d5bA8867b3C35bC0D3c5Eda8 --port=<your port> --bootstrap-ip=ec2-34-207-242-13.compute-1.amazonaws.com --bootstrap-port=8080`
 
-## API
-Note: In order to use the API a node must be running.
-
 ### RPC
 Mercury uses gRPC to let you communicate directly with a node.
 Authentication and Security is pending.
@@ -79,21 +73,16 @@ Query the node for a status report
 example with grpcurl:
 ```
 grpcurl -plaintext 127.0.0.1:9081 proto.NodeService/GetNodeStatus
->> {
->>   "address": "0xa7ED5257C26Ca5d8aF05FdE04919ce7d4a959147",
->>   "name": "tony",
->>   "hash": "0000000000000000000000000000000000000000000000000000000000000000"
->> }
+> {
+>   "address": "0xEA3d0650a05d8F94DFFEd9514594BE2532Bec001",
+>   "balance": 8,
+>   "channels": [
+>     "test",
+>     "test"
+>   ]
+> }
+
 ```
-
-#### ListKnownPeers
-Retrieve a list of a node's known peers
-`rpc ListKnownPeers(ListKnownPeersRequest) returns (stream ListKnownPeersResponse) {}`
-
-#### ListBlocks
-List blocks mined by a peer from a given hash onwards.
-`rpc ListBlocks(ListBlocksRequest) returns (stream BlockResponse) {}`
-
 #### AddTransaction
 The main functionality (to be extended...): Create a new pending transaction that, once mined, will allow us to send generic tx payloads across nodes.
 `rpc AddTransaction(AddPendingPublishCIDTransactionRequest) returns (AddPendingPublishCIDTransactionResponse) {}`
@@ -107,10 +96,6 @@ grpcurl -plaintext -d @ 127.0.0.1:9081 proto.NodeService/AddTransaction <<EOM
 EOM
 
 ```
-#### ListPendingTransactions
-`rpc ListPendingTransactions(ListPendingTransactionsRequest) returns (stream PendingTransactionResponse) {}`
-List all of a node's pending transactions
-
 
 ## Development
 

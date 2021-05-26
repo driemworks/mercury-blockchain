@@ -199,42 +199,52 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 		log.Fatalln(err)
 	}
 	pending_tx_channel, err := InitChannel(ctx, PENDING_TX_TOPIC, 128, ps, host.ID())
-	new_block_cr, err := JoinNewBlockExchange(ctx, ps, host.ID())
+	// new_block_cr, err := JoinNewBlockExchange(ctx, ps, host.ID())
+	block_sync_channel, err := InitChannel(ctx, NEW_BLOCKS_TOPIC, 128, ps, host.ID())
 	for {
 		select {
-		// youre reading a tx from the stream
+		// reading pending tx from topic
 		case data := <-pending_tx_channel.Data:
 			var tx state.SignedTx
 			err := json.Unmarshal(data.Data, &tx)
 			if err != nil {
-				fmt.Println("yeah.. this is the culprit")
 				return err
 			}
 			n.AddPendingTX(tx)
 		case tx := <-n.newPendingTXs:
+			// writing pending tx to topic
 			txJson, err := json.Marshal(tx)
 			if err != nil {
 				log.Fatalln(err)
 			}
 			pending_tx_channel.Publish(MessageTransport{txJson})
-		case b := <-new_block_cr.NewBlocks:
-			s, _, err := n.state.AddBlock(*b)
+		case data := <-block_sync_channel.Data:
+			// read block from topic
+			var b state.Block
+			err := json.Unmarshal(data.Data, &b)
+			if err != nil {
+				return err
+			}
+			s, _, err := n.state.AddBlock(b)
 			if err != nil {
 				if s != nil {
 					n.state = s
 				}
 				return err
 			}
-			n.newSyncedBlocks <- *b
+			n.newSyncedBlocks <- b
 		case block := <-n.newMinedBlocks:
-			new_block_cr.Publish(&block)
+			// write block to topic
+			blockJson, err := json.Marshal(block)
+			if err != nil {
+				return err
+			}
+			block_sync_channel.Publish(MessageTransport{blockJson})
 		}
 	}
 }
 
-func streamData(ctx context.Context, host host.Host, topic protocol.ID,
-	peerId peer.ID, data interface{}) {
-	// send new pending txs to new peer
+func streamData(ctx context.Context, host host.Host, topic protocol.ID, peerId peer.ID, data interface{}) {
 	s, err := host.NewStream(ctx, peerId, topic)
 	if err != nil {
 		log.Fatalln(err)
@@ -245,8 +255,4 @@ func streamData(ctx context.Context, host host.Host, topic protocol.ID,
 	}
 	dataJson = append(dataJson, '\n')
 	s.Write(dataJson)
-	// err = s.Close()
-	// if err != nil {
-	// 	log.Fatalln(err)
-	// }
 }
