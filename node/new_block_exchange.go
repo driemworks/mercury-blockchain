@@ -83,7 +83,6 @@ func (cr *NewBlockExchange) readLoop() {
 		if err != nil {
 			continue
 		}
-		// send valid messages onto the Messages channel
 		cr.NewBlocks <- cm
 	}
 }

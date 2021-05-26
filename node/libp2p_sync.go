@@ -4,20 +4,19 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 
 	"github.com/driemworks/mercury-blockchain/state"
-	"github.com/fatih/structs"
 	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	noise "github.com/libp2p/go-libp2p-noise"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -27,6 +26,8 @@ import (
 const (
 	DiscoveryServiceTag            = "mercury-service-tag"
 	DiscoveryServiceTag_PendingTxs = "pending_txs"
+	DiscoveryServiceTag_Blocks     = "blocks"
+	DiscoveryServiceTag_Announce   = "announce"
 )
 
 /*
@@ -85,6 +86,16 @@ func addPeers(ctx context.Context, n Node, kad *dht.IpfsDHT, peersArg string, do
 			if err != nil {
 				log.Fatalln(err)
 			}
+			// stream your latest block hash to
+			s, err := n.host.NewStream(ctx, peerID, DiscoveryServiceTag_Announce)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			hashBytes, err := n.state.LatestBlockHash().MarshalText()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			s.Write(hashBytes)
 		}
 	}
 }
@@ -110,20 +121,32 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 	}
 
 	log.Printf("Listening on %v (Protocols: %v)", host.Addrs(), host.Mux().Protocols())
-	host.SetStreamHandler(pubsub.RemoteTracerProtoID, func(s network.Stream) {
-		// called when peer connects only?? verify this...
-		s, err := host.NewStream(ctx, s.Conn().RemotePeer(), "PENDING_TX_SYNC")
+	host.SetStreamHandler(DiscoveryServiceTag_Announce, func(s network.Stream) {
+		if n.pendingTXs != nil {
+			streamData(ctx, host, DiscoveryServiceTag_PendingTxs, s.Conn().RemotePeer(), n.pendingTXs)
+		}
+		// read the peer's latest blockhash from the stream
+		buf := bufio.NewReader(s)
+		bytes, err := buf.ReadBytes('\n')
+		var blockHash state.Hash
+		err = json.Unmarshal(bytes, &blockHash)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		pendingJson, err := json.Marshal(n.pendingTXs)
+		blocks, err := state.GetBlocksAfter(blockHash, n.datadir)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		pendingJson = append(pendingJson, '\n')
-		s.Write(pendingJson)
+		if blocks != nil {
+			streamData(ctx, host, DiscoveryServiceTag_Blocks, s.Conn().RemotePeer(), blocks)
+		}
+		err = s.Close()
+		if err != nil {
+			log.Fatalln("", err)
+		}
 	})
-	host.SetStreamHandler("PENDING_TX_SYNC", func(s network.Stream) {
+	// sync pending txs (from bootstrap node) on startup
+	host.SetStreamHandler(DiscoveryServiceTag_PendingTxs, func(s network.Stream) {
 		buf := bufio.NewReader(s)
 		bytes, err := buf.ReadBytes('\n')
 		if err != nil {
@@ -135,7 +158,35 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 			log.Fatalln(err)
 		}
 		n.pendingTXs = txs
+		err = s.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
 	})
+	// sync blocks (from bootstrap) on startup
+	host.SetStreamHandler(DiscoveryServiceTag_Blocks, func(s network.Stream) {
+		buf := bufio.NewReader(s)
+		bytes, err := buf.ReadBytes('\n')
+		if err != nil {
+			log.Fatalln(err)
+		}
+		var blocks []state.Block
+		err = json.Unmarshal(bytes, &blocks)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		for _, b := range blocks {
+			_, _, err = n.state.AddBlock(b)
+			if err != nil {
+				log.Fatalln(err)
+			}
+		}
+		err = s.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	})
+
 	peerinfo, err := peer.AddrInfoFromP2pAddr(multiaddr.StringCast(bootstrapPeer))
 	tracer, err := pubsub.NewRemoteTracer(ctx, host, *peerinfo)
 	if err != nil {
@@ -153,26 +204,19 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 		select {
 		// youre reading a tx from the stream
 		case data := <-pending_tx_channel.Data:
-			txMap := data["Tx"]
-			bytes, err := json.Marshal(txMap)
+			var tx state.SignedTx
+			err := json.Unmarshal(data.Data, &tx)
 			if err != nil {
+				fmt.Println("yeah.. this is the culprit")
 				return err
 			}
-			var tx state.Tx
-			err = json.Unmarshal(bytes, &tx)
-			if err != nil {
-				return err
-			}
-			sig_string := fmt.Sprintf("%v", data["Sig"])
-			sig, _ := base64.RawStdEncoding.DecodeString(sig_string)
-			signedTx := state.NewSignedTx(tx, sig)
-			n.AddPendingTX(signedTx)
-			//add to dht... how to clear?
-			kademliaDHT.PutValue(ctx, "PENDING_TXS", bytes)
-		// youre writing txs to the stream
+			n.AddPendingTX(tx)
 		case tx := <-n.newPendingTXs:
-			txMap := structs.Map(tx)
-			pending_tx_channel.Publish(txMap)
+			txJson, err := json.Marshal(tx)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			pending_tx_channel.Publish(MessageTransport{txJson})
 		case b := <-new_block_cr.NewBlocks:
 			s, _, err := n.state.AddBlock(*b)
 			if err != nil {
@@ -188,6 +232,21 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 	}
 }
 
-type TransactionTransmissionWrapper struct {
-	SignedTx state.SignedTx `json:"signed_transaction"`
+func streamData(ctx context.Context, host host.Host, topic protocol.ID,
+	peerId peer.ID, data interface{}) {
+	// send new pending txs to new peer
+	s, err := host.NewStream(ctx, peerId, topic)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	dataJson, err := json.Marshal(data)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	dataJson = append(dataJson, '\n')
+	s.Write(dataJson)
+	// err = s.Close()
+	// if err != nil {
+	// 	log.Fatalln(err)
+	// }
 }

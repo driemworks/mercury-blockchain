@@ -88,40 +88,42 @@ func NewStateFromDisk(datadir string) (*State, error) {
 func (s *State) AddBlock(b Block) (*State, Hash, error) {
 	pendingState := s.copy()
 	latestBlock := s.latestBlock
-	hash, err := b.Hash()
-	if err != nil {
-		return s, Hash{}, err
-	}
+	// hash, err := b.Hash()
+	// if err != nil {
+	// 	return s, Hash{}, err
+	// }
 	if s.hasGenesisBlock && b.Header.Number < latestBlock.Header.Number+1 {
 		if s.latestBlock.Header.Number == b.Header.Number {
-			if s.latestBlockHash == hash {
-				return nil, Hash{}, nil
-			} else if s.latestBlock.Header.PoW < b.Header.PoW {
-				// orphan your latest block, wait until next sync cycle to get new blocks
-				// could change this, but this is the simplest way to do it
-				// fmt.Println("Another node mined the same block as you, but the proof of work was greater.")
-				// fmt.Println("Rolling back latest block and reclaiming mining reward")
-				// fmt.Println(rainbow.Red("Sorry"))
-				// err = s.orphanLatestBlock()
-				// if err != nil {
-				// 	return nil, Hash{}, err
-				// }
-				// // reset the node's state
-				// pendingState, err := NewStateFromDisk(pendingState.datadir)
-				// if err != nil {
-				// 	return nil, Hash{}, err
-				// }
-				// s = pendingState
-				return nil, Hash{}, nil
-				// return s, Hash{}, fmt.Errorf("ORPHAN BLOCK ENCOUNTERED")
-			} else {
-				// your block wins... stop mining from this peer
-				// fmt.Println("congrats.. your block wins (greater PoW)")
-				return nil, Hash{}, nil
-			}
+			// if s.latestBlockHash == hash {
+			// 	return nil, Hash{}, nil
+			// } else if s.latestBlock.Header.PoW < b.Header.PoW {
+			// 	// orphan your latest block, wait until next sync cycle to get new blocks
+			// 	// could change this, but this is the simplest way to do it
+			// 	// fmt.Println("Another node mined the same block as you, but the proof of work was greater.")
+			// 	// fmt.Println("Rolling back latest block and reclaiming mining reward")
+			// 	// fmt.Println(rainbow.Red("Sorry"))
+			// 	// err = s.orphanLatestBlock()
+			// 	// if err != nil {
+			// 	// 	return nil, Hash{}, err
+			// 	// }
+			// 	// // reset the node's state
+			// 	// pendingState, err := NewStateFromDisk(pendingState.datadir)
+			// 	// if err != nil {
+			// 	// 	return nil, Hash{}, err
+			// 	// }
+			// 	// s = pendingState
+			// 	return nil, Hash{}, nil
+			// 	// return s, Hash{}, fmt.Errorf("ORPHAN BLOCK ENCOUNTERED")
+			// } else {
+			// 	// your block wins... stop mining from this peer
+			// 	// fmt.Println("congrats.. your block wins (greater PoW)")
+			// 	return nil, Hash{}, nil
+			// }
+			return nil, Hash{}, nil
+
 		}
 	}
-	err = ApplyBlock(b, &pendingState)
+	err := ApplyBlock(b, &pendingState)
 	if err != nil {
 		return nil, Hash{}, err
 	}
@@ -296,68 +298,12 @@ func applyTx(tx SignedTx, s *State) error {
 	if err != nil {
 		return fmt.Errorf("bad Tx. Can't calculate tx hash")
 	}
-	// topic := tx.Topic
-	// clone the state
-	// var senderMailbox = s.Manifest[tx.From]
-	// senderMailbox.Sent = append(senderMailbox.Sent, SentItem{tx.To, cid, txHash, tx.Amount})
-	// senderMailbox.Balance = senderMailbox.PendingBalance
-	// s.Manifest[tx.From] = senderMailbox
 	var currentNodeState = s.Catalog[tx.Author]
 	// for now, just assume topic creation only?
 	currentNodeState.Channels = append(currentNodeState.Channels, []byte(tx.Topic))
 	// TODO: assume for now that topic creation costs 1 coin
 	currentNodeState.Balance = currentNodeState.Balance - 1
 	s.Catalog[tx.Author] = currentNodeState
-
-	// could ignore transactions that aren't mine?
-	// cid := tx.Payload
-	// the below will update the state based on the transaction type
-	// if tx.Type == TX_TYPE_001 {
-	// map the payload to a CID
-	// var cid CID
-	// TODO: Is this really a good way to handle the different unmarshal outputs?
-	// switch t := payload.Value.(type) {
-	// case map[string]interface{}:
-	// 	cid_string := fmt.Sprintf("%v", t["cid"])
-	// 	gateway_string := fmt.Sprintf("%v", t["ipfs_gateway"])
-	// 	name_string := fmt.Sprintf("%v", t["name"])
-	// 	cid = NewCID(cid_string, gateway_string, name_string)
-	// default:
-	// 	cid = payload.Value.(CID)
-	// }
-	// var senderMailbox = s.Manifest[tx.From]
-	// senderMailbox.Sent = append(senderMailbox.Sent, SentItem{tx.To, cid, txHash, tx.Amount})
-	// senderMailbox.Balance = senderMailbox.PendingBalance
-	// s.Manifest[tx.From] = senderMailbox
-	// update recipient inbox items
-	// var receipientMailbox = s.Manifest[tx.To]
-	// receipientMailbox.Balance += tx.Amount
-	// receipientMailbox.Inbox = append(receipientMailbox.Inbox, InboxItem{tx.From, cid, txHash, tx.Amount})
-	// s.Manifest[tx.To] = receipientMailbox
-	// s.Account2Nonce[tx.From] = tx.Nonce
-	// } else if tx.Type == TX_TYPE_002 {
-	// 	fmt.Println("Adding trusted peer from transaction")
-	// 	var peerNode core.PeerNode
-	// 	switch t := payload.Value.(type) {
-	// 	case map[string]interface{}:
-	// 		name := fmt.Sprintf("%v", t["name"])
-	// 		ip := fmt.Sprintf("%v", t["ip"])
-	// 		port, _ := strconv.ParseUint(fmt.Sprintf("%v", t["port"]), 10, 64)
-	// 		isBootstrap, _ := strconv.ParseBool(fmt.Sprintf("%v", t["is_bootstrap"]))
-	// 		address := NewAddress(fmt.Sprintf("%v", t["address"]))
-	// 		peerNode = core.NewPeerNode(
-	// 			name, ip, port, isBootstrap, address, true,
-	// 		)
-	// 	default:
-	// 		payload := tx.Payload.Value.(TrustPeerTransactionPayload)
-	// 		peerNode = core.NewPeerNode(
-	// 			payload.Name, payload.IP, payload.Port, payload.IsBootstrap, payload.Address, true,
-	// 		)
-	// 	}
-	// 	trustedPeersClone := s.Manifest[tx.From]
-	// 	trustedPeersClone.TrustedPeers = append(s.Manifest[tx.From].TrustedPeers, peerNode)
-	// 	s.Manifest[tx.From] = trustedPeersClone
-	// }
 	s.Account2Nonce[tx.Author] = tx.Nonce
 	return nil
 }

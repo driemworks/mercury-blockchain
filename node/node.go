@@ -120,11 +120,10 @@ func (n *Node) minePendingTXs(ctx context.Context) error {
 
 	n.removeMinedPendingTXs(minedBlock)
 	_, _, err = n.state.AddBlock(minedBlock)
-	n.newMinedBlocks <- minedBlock
 	if err != nil {
 		return err
 	}
-
+	n.newMinedBlocks <- minedBlock
 	return nil
 }
 
@@ -167,11 +166,11 @@ func (n *Node) AddPendingTX(tx state.SignedTx) error {
 
 		fmt.Printf("Adding pending transactions: \n%s\n", &prettyTxJSON)
 		tmpFrom := n.state.Catalog[tx.Author]
-		if tmpFrom.Balance <= 0 {
-			// for now...
-			tmpFrom.Balance = 10
-			// return fmt.Errorf("Insufficient balance")
-		}
+		// if tmpFrom.Balance <= 0 {
+		// 	// for now...
+		// 	tmpFrom.Balance = 10
+		// 	// return fmt.Errorf("Insufficient balance")
+		// }
 		tmpFrom.Balance -= 1
 		n.pendingTXs[txHash.Hex()] = tx
 		n.state.Catalog[tx.Author] = tmpFrom

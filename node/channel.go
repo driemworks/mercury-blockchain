@@ -12,12 +12,16 @@ import (
 const PENDING_TX_TOPIC = "PENDING_TX_TOPIC"
 const NEW_BLOCKS_TOPIC = "NEW_BLOCKS_TOPIC"
 
+type MessageTransport struct {
+	Data []byte
+}
+
 // Channel represents a subscription to a single PubSub topic. Messages
 // can be published to the topic with Channel.Publish, and received
 // messages are pushed to the Messages channel.
 type Channel struct {
 	// A channel of signed transactions to send new pending transactions to peers
-	Data      chan map[string]interface{}
+	Data      chan MessageTransport
 	topicName string
 	ctx       context.Context
 	ps        *pubsub.PubSub
@@ -41,7 +45,7 @@ func InitChannel(ctx context.Context, topicName string, bufSize int, ps *pubsub.
 		topic: topic,
 		sub:   sub,
 		self:  selfID,
-		Data:  make(chan map[string]interface{}, bufSize),
+		Data:  make(chan MessageTransport, bufSize),
 	}
 	// start reading messages from the subscription in a loop
 	go ch.readLoop()
@@ -49,7 +53,7 @@ func InitChannel(ctx context.Context, topicName string, bufSize int, ps *pubsub.
 }
 
 // Publish sends a message to the pubsub topic.
-func (cr *Channel) Publish(msg map[string]interface{}) error {
+func (cr *Channel) Publish(msg MessageTransport) error {
 	msgBytes, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -74,7 +78,7 @@ func (cr *Channel) readLoop() {
 		if msg.ReceivedFrom == cr.self {
 			continue
 		}
-		cm := new(map[string]interface{})
+		cm := new(MessageTransport)
 		err = json.Unmarshal(msg.Data, cm)
 		if err != nil {
 			fmt.Println(err)
