@@ -199,7 +199,6 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 		log.Fatalln(err)
 	}
 	pending_tx_channel, err := InitChannel(ctx, PENDING_TX_TOPIC, 128, ps, host.ID())
-	// new_block_cr, err := JoinNewBlockExchange(ctx, ps, host.ID())
 	block_sync_channel, err := InitChannel(ctx, NEW_BLOCKS_TOPIC, 128, ps, host.ID())
 	for {
 		select {
