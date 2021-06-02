@@ -1,12 +1,14 @@
 # Mercury Blockchain
-Mercury is simple a blockchain built on top of go-libp2p. Currently, mercury only allows nodes to "publish" a topic encoded within a transaction, but the intention is achieve something similar to Holochain.
+Mercury is simple a blockchain built on top of go-libp2p. Current, Mercury is in phase 0: in the current incarnation Mercury is a blockchain-based p2p chat app, where different chat rooms are encoded as transactions within blocks. The intention is to accomplish decentralized state management via blockchain (reminiscent of Holochain).
 
 ## TODOS
 - Replace PoW with more efficient consensus algorithm.. proof of contribution?
+- ListBlocks 
 - test coverage
 
 ## Getting Started
 ### Introduction
+For the time being, assume that each topic requires at least one node at all times. 
 TODO
 
 ### Pre requisites
@@ -32,7 +34,7 @@ Note: if you're running linux you may need to set `export GO111MODULE=on;go get 
     -  options:
       - `--name`: (optional) The name of your node - Default: `""`
       - `--datadir`: (optional) the directory where local data will be stored - Default: `.mercury`
-      - `--ip`: (optional) the ip addreses of the mercury node - Default: `127.0.01`
+      - `--ip`: (optional) the ip addreses of the mercury node - Default: `127.0.0.1`
       - `--port`: (optional) the port of the mercury node - Default: `8080`
       - `--miner`: (required) the public key to use (see: output of wallet command)
       - `--bootstrap`: (optional) Multihash of the peer you want to use as a bootstrap. This will be in the form `/ip4/<peer-ip>/tcp/<peer-port>/p2p/<peer node hash>` - Defaut: `""`
@@ -83,17 +85,32 @@ grpcurl -plaintext 127.0.0.1:9081 proto.NodeService/GetNodeStatus
 
 ```
 #### AddTransaction
-The main functionality (to be extended...): Create a new pending transaction that, once mined, will allow us to send generic tx payloads across nodes.
+The main functionality (to be extended...): Create a new pending transaction that, once mined, will allow us to send generic tx payloads across nodes. Security has not been considered whatsoever with the current implementation.
 `rpc AddTransaction(AddPendingPublishCIDTransactionRequest) returns (AddPendingPublishCIDTransactionResponse) {}`
 
-Example
+Example 
 ```
 grpcurl -plaintext -d @ 127.0.0.1:9081 proto.NodeService/AddTransaction <<EOM
 {
-    "topic": "test"
+    "label": "hello",
+    "password": "test"
 }
 EOM
+```
 
+### ListBlocks
+TODO: this needs to be updated so we can actually stream blocks instead of just list them
+
+List blocks from some given block hash, fromBlock. If empty, it is assumed to be from the genesis block.
+
+
+Example 
+```
+grpcurl -plaintext -d @ 127.0.0.1:9081 proto.NodeService/ListBlocks <<EOM
+{
+    "fromBlock": ""
+}
+EOM
 ```
 
 ## Development

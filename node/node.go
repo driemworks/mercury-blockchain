@@ -11,10 +11,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/libp2p/go-libp2p-core/host"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/raphamorim/go-rainbow"
 )
 
-const miningIntervalSeconds = 45
+const miningIntervalSeconds = 15
 
 type Node struct {
 	datadir         string
@@ -25,12 +26,13 @@ type Node struct {
 	pendingTXs      map[string]state.SignedTx
 	archivedTXs     map[string]state.SignedTx
 	newSyncedBlocks chan state.Block
-	newMinedBlocks  chan state.Block
-	newPendingTXs   chan state.SignedTx
+	newMinedBlocks  chan core.MessageTransport
+	newPendingTXs   chan core.MessageTransport
 	isMining        bool
 	name            string
 	tls             bool
 	host            host.Host
+	pubsub          *pubsub.PubSub
 }
 
 func NewNode(name string, datadir string, miner string, ip string, port uint64, tls bool) *Node {
@@ -44,14 +46,14 @@ func NewNode(name string, datadir string, miner string, ip string, port uint64, 
 		pendingTXs:      make(map[string]state.SignedTx),
 		archivedTXs:     make(map[string]state.SignedTx),
 		newSyncedBlocks: make(chan state.Block),
-		newMinedBlocks:  make(chan state.Block),
-		newPendingTXs:   make(chan state.SignedTx, 10000),
+		newMinedBlocks:  make(chan core.MessageTransport),
+		newPendingTXs:   make(chan core.MessageTransport, 10000),
 		isMining:        false,
 		tls:             tls,
 	}
 }
 
-func (n *Node) Run(ctx context.Context, port int, peer string, name string) error {
+func (n *Node) Run(ctx context.Context, ip string, port int, peer string, name string) error {
 	state, err := state.NewStateFromDisk(n.datadir)
 	if err != nil {
 		return err
@@ -60,7 +62,7 @@ func (n *Node) Run(ctx context.Context, port int, peer string, name string) erro
 	n.state = state
 	go n.runRPCServer("", "")
 	go n.mine(ctx)
-	err = n.runLibp2pNode(ctx, port, peer, name)
+	err = n.runLibp2pNode(ctx, ip, port, peer, name)
 	if err != nil {
 		return err
 	}
@@ -98,7 +100,6 @@ func (n *Node) mine(ctx context.Context) error {
 				n.removeMinedPendingTXs(block)
 				stopCurrentMining()
 			}
-
 		case <-ctx.Done():
 			ticker.Stop()
 			return nil
@@ -123,7 +124,11 @@ func (n *Node) minePendingTXs(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	n.newMinedBlocks <- minedBlock
+	blockBytes, err := json.Marshal(minedBlock)
+	if err != nil {
+		return err
+	}
+	n.newMinedBlocks <- core.MessageTransport{blockBytes}
 	return nil
 }
 
@@ -187,4 +192,26 @@ func (n *Node) getPendingTXsAsArray() []state.SignedTx {
 		i++
 	}
 	return txs
+}
+
+func (n *Node) Join(ctx context.Context, topicName string,
+	bufSize int, onMessage core.MessageHandler,
+	msgChan chan core.MessageTransport) error {
+	topic, err := n.pubsub.Join(topicName)
+	if err != nil {
+		return err
+	}
+	sub, err := topic.Subscribe()
+	if err != nil {
+		return err
+	}
+	ch := &core.PubSubWrapper{
+		Topic: topic,
+		Sub:   sub,
+		Self:  n.host.ID(),
+		Data:  make(chan core.MessageTransport, bufSize),
+	}
+	go ch.ReadLoop(ctx, onMessage)
+	go ch.Publish(ctx, msgChan)
+	return nil
 }

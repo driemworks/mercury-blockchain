@@ -8,9 +8,11 @@ service NodeService  {
     // // read/write to known peers
     // rpc ListKnownPeers(ListKnownPeersRequest) returns (stream ListKnownPeersResponse) {}
     // // read/write blocks 
-    // rpc ListBlocks(ListBlocksRequest) returns (stream BlockResponse) {}
+    rpc ListBlocks(ListBlocksRequest) returns (stream BlockResponse) {}
     // add pending transaction
     rpc AddTransaction(AddPendingTransactionRequest) returns (AddPendingTransactionResponse) {}
+    rpc Subscribe(JoinChannelRequest) returns (stream ChannelData) {}
+    rpc Publish(PublishRequest) returns (PublishResponse) {}
     // list pending transactions
     // rpc ListTransactions(ListPendingTransactionsRequest) returns (stream PendingTransactionResponse) {}
 }
@@ -21,7 +23,8 @@ message PendingTransactionResponse {
 }
 
 message AddPendingTransactionRequest {
-    string topic = 1;
+    string label = 1;
+    string password = 2;
 }
 
 message AddPendingTransactionResponse { }
@@ -30,8 +33,18 @@ message ListBlocksRequest {
     string fromBlock = 1;
 }
 message BlockResponse {
-    bytes block = 1;
+    BlockHeaderMessage blockHeader = 1;
+    repeated TransactionMessage txs = 2;
 }
+
+message TransactionMessage {
+    string author = 1;
+    string topic = 2;
+    string nonce = 4;
+    string time = 5;
+    string signature = 6;
+}
+
 message BlockHeaderMessage {
     string parent = 1;
     uint64 time = 2;
@@ -59,3 +72,20 @@ message NodeInfoResponse {
     repeated string subscriptions = 3;
     repeated string channels = 4;
 }
+
+message JoinChannelRequest {
+    string txHash = 1;
+}
+
+message ChannelData {
+    string data = 1;
+    string from = 2;
+    string topic = 3;
+}
+
+message PublishRequest {
+    string txHash = 1;
+    string message = 2;
+}
+
+message PublishResponse {}

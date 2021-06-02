@@ -17,13 +17,13 @@ import (
 const BlockReward = float32(10)
 
 type CurrentNodeState struct {
-	Subscriptions  [][]byte `json:"subscriptions"`
-	Channels       [][]byte `json:"channels"`
+	OwnedChannels  [][]byte `json:"channels"`
 	Balance        float32  `json:"balance"`
 	PendingBalance float32  `json:"pending_balance"`
 }
 
 type State struct {
+	Subscriptions        map[string]chan core.MessageTransport
 	Catalog              map[common.Address]CurrentNodeState
 	Account2Nonce        map[common.Address]uint
 	PendingAccount2Nonce map[common.Address]uint
@@ -52,7 +52,9 @@ func NewStateFromDisk(datadir string) (*State, error) {
 	// using manifest as var and Manifest as type, but they are not the same thing
 	manifest := make(map[common.Address]CurrentNodeState)
 	for account, s := range gen.State {
-		manifest[account] = CurrentNodeState{s.Subscriptions, s.Channels, s.Balance, s.PendingBalance}
+		// subscriptions not managed via the blockchain, so shall be nil for now...
+		// this will change
+		manifest[account] = CurrentNodeState{s.OwnedChannels, s.Balance, s.PendingBalance}
 	}
 
 	blockDbFile, err := os.OpenFile(getBlocksDbFilePath(datadir, false), os.O_APPEND|os.O_RDWR, 0600)
@@ -62,7 +64,7 @@ func NewStateFromDisk(datadir string) (*State, error) {
 	scanner := bufio.NewScanner(blockDbFile)
 	account2Nonce := make(map[common.Address]uint)
 	pendingAccount2Nonce := make(map[common.Address]uint)
-	state := &State{manifest, account2Nonce, pendingAccount2Nonce, make([]Tx, 0), Block{}, Hash{}, blockDbFile, datadir, true}
+	state := &State{make(map[string]chan core.MessageTransport, 0), manifest, account2Nonce, pendingAccount2Nonce, make([]Tx, 0), Block{}, Hash{}, blockDbFile, datadir, true}
 	for scanner.Scan() {
 		// handle scanner error
 		if err := scanner.Err(); err != nil {
@@ -89,9 +91,7 @@ func (s *State) AddBlock(b Block) (*State, Hash, error) {
 	pendingState := s.copy()
 	latestBlock := s.latestBlock
 	if s.hasGenesisBlock && b.Header.Number < latestBlock.Header.Number+1 {
-		// if s.latestBlock.Header.Number == b.Header.Number {
 		return nil, Hash{}, nil
-		// }
 	}
 	err := ApplyBlock(b, &pendingState)
 	if err != nil {
@@ -202,13 +202,17 @@ func applyTx(tx SignedTx, s *State) error {
 	// 	return fmt.Errorf("bad Tx. You have no remaining balance")
 	// }
 
-	_, err = tx.Hash()
+	h, err := tx.Hash()
 	if err != nil {
 		return fmt.Errorf("bad Tx. Can't calculate tx hash")
 	}
+	hashText, err := h.MarshalText()
+	if err != nil {
+		return fmt.Errorf("bad Tx. Can't marshal tx hash")
+	}
 	var currentNodeState = s.Catalog[tx.Author]
 	// for now, just assume topic creation only?
-	currentNodeState.Channels = append(currentNodeState.Channels, []byte(tx.Topic))
+	currentNodeState.OwnedChannels = append(currentNodeState.OwnedChannels, hashText)
 	// TODO: assume for now that topic creation costs 1 coin
 	currentNodeState.Balance = currentNodeState.Balance - 1
 	s.Catalog[tx.Author] = currentNodeState

@@ -4,11 +4,13 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 
+	"github.com/driemworks/mercury-blockchain/core"
 	"github.com/driemworks/mercury-blockchain/state"
 	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -32,17 +34,18 @@ const (
 /*
 	Build a libp2p host
 */
-func makeHost(port int, insecure bool) (host.Host, error) {
+func makeHost(ip string, port int, insecure bool) (host.Host, error) {
 	r := rand.Reader
 	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)
 	if err != nil {
 		return nil, err
 	}
 	opts := []libp2p.Option{
-		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", port)),
+		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/%s/tcp/%d", ip, port)),
 		libp2p.Identity(priv),
 		libp2p.DisableRelay(),
 		libp2p.Security(noise.ID, noise.New),
+		libp2p.EnableNATService(),
 	}
 	if insecure {
 		opts = append(opts, libp2p.NoSecurity)
@@ -55,7 +58,6 @@ func makeHost(port int, insecure bool) (host.Host, error) {
 	addr := host.Addrs()[0]
 	fullAddr := addr.Encapsulate(hostAddr)
 	fmt.Printf("I am %s\n", fullAddr)
-	fmt.Println(host.ID().Pretty())
 	return host, nil
 }
 
@@ -71,11 +73,6 @@ func addPeers(ctx context.Context, n Node, peersArg string, doRelay bool) {
 	for i := 0; i < len(peerStrs); i++ {
 		peerID, peerAddr := MakePeer(peerStrs[i])
 		n.host.Peerstore().AddAddr(peerID, peerAddr, peerstore.PermanentAddrTTL)
-		// _, err := kad.RoutingTable().TryAddPeer(peerID, false, false)
-		// if err != nil {
-		// 	log.Fatalln(err)
-		// }
-		// if the peer is already in the DHT, do not call it again
 		if doRelay {
 			peerinfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
 			if err != nil {
@@ -85,67 +82,58 @@ func addPeers(ctx context.Context, n Node, peersArg string, doRelay bool) {
 			if err != nil {
 				log.Fatalln(err)
 			}
-			// stream your latest block hash to
 			s, err := n.host.NewStream(ctx, peerID, DiscoveryServiceTag_Announce)
 			if err != nil {
 				log.Fatalln(err)
 			}
-			hashBytes, err := n.state.LatestBlockHash().MarshalText()
-			if err != nil {
-				log.Fatalln(err)
-			}
+			hashBytes := []byte(n.state.LatestBlockHash().Hex())
+			hashBytes = append(hashBytes, '\n')
 			s.Write(hashBytes)
 		}
 	}
 }
 
-func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string, name string) error {
-	host, err := makeHost(port, false)
+func (n *Node) runLibp2pNode(ctx context.Context, ip string, port int, bootstrapPeer string, name string) error {
+	host, err := makeHost(ip, port, false)
 	n.host = host
 	if err != nil {
 		return err
 	}
-	// 1) Start a DHT
-	// kademliaDHT, err := dht.New(ctx, host)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer kademliaDHT.Close()
 	// add bootstrap nodes if provided
 	if bootstrapPeer == "" {
 		// TODO leaving as localhost for now. Should this be configurable?
-		bootstrapPeer = fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", port, host.ID().Pretty())
+		bootstrapPeer = fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", ip, port, host.ID().Pretty())
 	} else {
 		addPeers(ctx, *n, bootstrapPeer, true)
 	}
 
 	log.Printf("Listening on %v (Protocols: %v)", host.Addrs(), host.Mux().Protocols())
 	host.SetStreamHandler(DiscoveryServiceTag_Announce, func(s network.Stream) {
-		if n.pendingTXs != nil {
-			streamData(ctx, host, DiscoveryServiceTag_PendingTxs, s.Conn().RemotePeer(), n.pendingTXs)
-		}
+		// fmt.Println(DiscoveryServiceTag_Announce)
 		// read the peer's latest blockhash from the stream
 		buf := bufio.NewReader(s)
 		bytes, err := buf.ReadBytes('\n')
-		var blockHash state.Hash
-		err = json.Unmarshal(bytes, &blockHash)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		blocks, err := state.GetBlocksAfter(blockHash, n.datadir)
+		// decode bytes
+		var decoded [32]byte
+		hex.Decode(bytes[:], decoded[:])
+		blocks, err := state.GetBlocksAfter(decoded, n.datadir)
 		if err != nil {
 			log.Fatalln(err)
 		}
 		if blocks != nil {
 			streamData(ctx, host, DiscoveryServiceTag_Blocks, s.Conn().RemotePeer(), blocks)
 		}
+		if n.pendingTXs != nil {
+			streamData(ctx, host, DiscoveryServiceTag_PendingTxs, s.Conn().RemotePeer(), n.pendingTXs)
+		}
 		err = s.Close()
 		if err != nil {
-			log.Fatalln("", err)
+			log.Fatalln(DiscoveryServiceTag_Announce, err)
 		}
 	})
 	// sync pending txs (from bootstrap node) on startup
 	host.SetStreamHandler(DiscoveryServiceTag_PendingTxs, func(s network.Stream) {
+		// fmt.Println(DiscoveryServiceTag_PendingTxs)
 		buf := bufio.NewReader(s)
 		bytes, err := buf.ReadBytes('\n')
 		if err != nil {
@@ -164,6 +152,7 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 	})
 	// sync blocks (from bootstrap) on startup
 	host.SetStreamHandler(DiscoveryServiceTag_Blocks, func(s network.Stream) {
+		// fmt.Println(DiscoveryServiceTag_Blocks)
 		buf := bufio.NewReader(s)
 		bytes, err := buf.ReadBytes('\n')
 		if err != nil {
@@ -194,52 +183,34 @@ func (n *Node) runLibp2pNode(ctx context.Context, port int, bootstrapPeer string
 	// create a pubsub service using the GossipSub router
 	var ps *pubsub.PubSub
 	ps, err = pubsub.NewGossipSub(ctx, host, pubsub.WithEventTracer(tracer))
+	n.pubsub = ps
 	if err != nil {
 		log.Fatalln(err)
 	}
-	pending_tx_channel, err := InitChannel(ctx, PENDING_TX_TOPIC, 128, ps, host.ID())
-	block_sync_channel, err := InitChannel(ctx, NEW_BLOCKS_TOPIC, 128, ps, host.ID())
-	for {
-		select {
-		// reading pending tx from topic
-		case data := <-pending_tx_channel.Data:
-			var tx state.SignedTx
-			err := json.Unmarshal(data.Data, &tx)
-			if err != nil {
-				return err
-			}
-			n.AddPendingTX(tx)
-		case tx := <-n.newPendingTXs:
-			// writing pending tx to topic
-			txJson, err := json.Marshal(tx)
-			if err != nil {
-				log.Fatalln(err)
-			}
-			pending_tx_channel.Publish(MessageTransport{txJson})
-		case data := <-block_sync_channel.Data:
-			// read block from topic
-			var b state.Block
-			err := json.Unmarshal(data.Data, &b)
-			if err != nil {
-				return err
-			}
-			s, _, err := n.state.AddBlock(b)
-			if err != nil {
-				if s != nil {
-					n.state = s
-				}
-				return err
-			}
-			n.newSyncedBlocks <- b
-		case block := <-n.newMinedBlocks:
-			// write block to topic
-			blockJson, err := json.Marshal(block)
-			if err != nil {
-				return err
-			}
-			block_sync_channel.Publish(MessageTransport{blockJson})
+	go n.Join(ctx, core.PENDING_TX_TOPIC, 128, func(data *pubsub.Message) {
+		var tx state.SignedTx
+		err := json.Unmarshal(data.Data, &tx)
+		if err != nil {
+			fmt.Errorf("failed to unmarshal json to SignedTx: %v", err)
 		}
-	}
+		n.AddPendingTX(tx)
+	}, n.newPendingTXs)
+	// join the reserved block sync topic
+	go n.Join(ctx, core.NEW_BLOCKS_TOPIC, 128, func(data *pubsub.Message) {
+		var b state.Block
+		err := json.Unmarshal(data.Data, &b)
+		if err != nil {
+			fmt.Errorf("failed to unmarshal json to Block: %v", err)
+		}
+		s, _, err := n.state.AddBlock(b)
+		if err != nil {
+			if s != nil {
+				n.state = s
+			}
+			fmt.Errorf("failed to add block: %v", err)
+		}
+	}, n.newMinedBlocks)
+	select {}
 }
 
 func streamData(ctx context.Context, host host.Host, topic protocol.ID, peerId peer.ID, data interface{}) {

@@ -12,9 +12,6 @@ import (
 	"github.com/raphamorim/go-rainbow"
 )
 
-// DefaultMiner is the miner address used if one is not provided
-const DefaultMiner = "0xasdf"
-
 // PendingBlock represents a block before it has been mined
 type PendingBlock struct {
 	parent state.Hash
@@ -48,7 +45,6 @@ func Mine(ctx context.Context, pb PendingBlock) (state.Block, error) {
 		select {
 		case <-ctx.Done():
 			fmt.Println("Mining cancelled!")
-
 			return state.Block{}, fmt.Errorf(rainbow.Red("mining cancelled. %s"), ctx.Err())
 		default:
 		}

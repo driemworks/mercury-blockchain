@@ -17,8 +17,10 @@ func NewAddress(value string) common.Address {
 type Tx struct {
 	Author common.Address `json:"author"`
 	Topic  string         `json:"topic"`
-	Nonce  uint           `json:"nonce"`
-	Time   uint64         `json:"time"`
+	// GenesisState []byte
+	// ValidationRules ???
+	Nonce uint   `json:"nonce"`
+	Time  uint64 `json:"time"`
 }
 
 type SignedTx struct {
