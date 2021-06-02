@@ -21,7 +21,7 @@ func runCmd() *cobra.Command {
 
 			name, _ := cmd.Flags().GetString(flagName)
 			miner, _ := cmd.Flags().GetString(flagMiner)
-			ip, _ := cmd.Flags().GetString(flagIP)
+			host, _ := cmd.Flags().GetString(flagHost)
 			port, _ := cmd.Flags().GetUint64(flagPort)
 			bootstrap, _ := cmd.Flags().GetString(flagBootstrap)
 			// validate/fix data issues (thanks Windows)
@@ -37,7 +37,7 @@ func runCmd() *cobra.Command {
 			`)))
 			fmt.Println(fmt.Sprintf("\tVersion %s.%s.%s-beta\n", Major, Minor, Patch))
 			n := node.NewNode(name, getDataDirFromCmd(cmd), miner, "127.0.0.1", port, false)
-			err := n.Run(context.Background(), ip, int(port), bootstrap, name)
+			err := n.Run(context.Background(), host, int(port), bootstrap, name)
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)
@@ -50,7 +50,7 @@ func runCmd() *cobra.Command {
 	runCmd.Flags().String(flagName, fmt.Sprintf("user-%d", rand.Int()), "Your username")
 	runCmd.Flags().String(flagMiner, "", "miner account of this node to receive block rewards")
 	runCmd.Flags().Uint64(flagPort, 8081, "The port to run the client on")
-	runCmd.Flags().String(flagIP, "127.0.0.1", "The ip to run the client with")
+	runCmd.Flags().String(flagHost, "127.0.0.1", "The ip to run the client with")
 	runCmd.Flags().String(flagBootstrap, "", "the bootstrap server to interconnect peers")
 	runCmd.Flags().Bool(flagTls, false, "true if tls is enabled (for the rpc server), false otherwise")
 	return runCmd

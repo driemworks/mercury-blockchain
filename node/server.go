@@ -97,16 +97,17 @@ func (server nodeServer) ListBlocks(
 	}
 
 	for _, block := range blocks {
-		// encoded, err := json.Marshal(block)
-		// if err != nil {
-		// 	break
-		// }
 		blockHeader := pb.BlockHeaderMessage{}
 		txs := make([]*pb.TransactionMessage, 0)
 		for _, t := range block.TXs {
+			hash, err := t.Hash()
+			if err != nil {
+				log.Fatalln("failed to hash the tx: ", err)
+			}
 			txMessage := pb.TransactionMessage{
 				Author: t.Author.Hex(),
 				Topic:  t.Topic,
+				Hash:   hash.Hex(),
 				// Nonce:  string(t.Nonce),
 				// Time:   string(t.Time),
 				// Signature: string(t.Sig),
@@ -134,7 +135,6 @@ func (server nodeServer) AddTransaction(
 	tx := state.NewTx(
 		server.node.miner, addPendingTransactionRequest.Label, nonce,
 	)
-	// []byte(addPendingTransactionRequest.GenesisJson)
 	signedTx, err := wallet.SignTxWithKeystoreAccount(
 		tx, server.node.miner, addPendingTransactionRequest.Password,
 		wallet.GetKeystoreDirPath(server.node.datadir))

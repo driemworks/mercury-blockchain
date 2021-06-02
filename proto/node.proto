@@ -43,6 +43,7 @@ message TransactionMessage {
     string nonce = 4;
     string time = 5;
     string signature = 6;
+    string hash = 7;
 }
 
 message BlockHeaderMessage {
