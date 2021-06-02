@@ -36,7 +36,7 @@ func runCmd() *cobra.Command {
 	    		        /___/  
 			`)))
 			fmt.Println(fmt.Sprintf("\tVersion %s.%s.%s-beta\n", Major, Minor, Patch))
-			n := node.NewNode(name, getDataDirFromCmd(cmd), miner, "127.0.0.1", port, false)
+			n := node.NewNode(name, getDataDirFromCmd(cmd), miner, "0.0.0.0", port, false)
 			err := n.Run(context.Background(), host, int(port), bootstrap, name)
 			if err != nil {
 				fmt.Println(err)
