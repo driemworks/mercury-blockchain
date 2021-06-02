@@ -52,7 +52,7 @@ This section explains how to get started using mercury.
   mercury wallet new-address --datadir=./.mercury
   >  0x27084384033F90d96c3769e1b4fCE0E5ffff720B
   # start a node using the new address as the miner
-  mercury run --datadir=./.mercury --name=tony --port=8081 --miner=0x27084384033F90d96c3769e1b4fCE0E5ffff720B
+  mercury run --datadir=./.mercury --name=tony --host=192.168.1.XYZ --port=8081 --miner=0x27084384033F90d96c3769e1b4fCE0E5ffff720B
   ```
 
 

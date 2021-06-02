@@ -3,6 +3,7 @@ package node
 import (
 	"crypto/tls"
 	"fmt"
+	"log"
 	"net"
 
 	pb "github.com/driemworks/mercury-blockchain/proto"
@@ -30,6 +31,7 @@ func (n *Node) runRPCServer(certFile string, keyFile string) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", n.ip, n.port+1000))
 	if err != nil {
 		fmt.Printf("Could not listen on %s:%d", n.ip, n.port+1000)
+		log.Fatalln(err)
 	}
 	fmt.Println(fmt.Sprintf("RPC server listening on: %s:%d", n.ip, n.port+1000))
 	err = grpcServer.Serve(lis)
