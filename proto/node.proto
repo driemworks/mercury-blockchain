@@ -89,4 +89,6 @@ message PublishRequest {
     string message = 2;
 }
 
-message PublishResponse {}
+message PublishResponse {
+    string message = 1;
+}

@@ -57,7 +57,7 @@ func (server nodeServer) Publish(
 	if dataChan := server.node.state.Subscriptions[publishRequest.TxHash]; dataChan != nil {
 		dataChan <- core.MessageTransport{[]byte(publishRequest.Message)}
 	} else {
-		fmt.Println("You must first be subscribed to the topic")
+		return &pb.PublishResponse{Message: "You must first be subscribed to the topic"}, nil
 	}
 	return &pb.PublishResponse{}, nil
 }

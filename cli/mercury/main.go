@@ -10,14 +10,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const flagDataDir = "datadir"
-const flagHost = "host"
-const flagPort = "port"
-const flagMiner = "miner"
-const flagName = "name"
-const flagKeystoreFile = "keystore"
-const flagBootstrap = "bootstrap"
-const flagTls = "tls"
+const (
+	flagDataDir      = "datadir"
+	flagHost         = "host"
+	flagPort         = "port"
+	flatRPCHost      = "rpc-host"
+	flagRPCPort      = "rpc-port"
+	flagAddress      = "address"
+	flagName         = "name"
+	flagKeystoreFile = "keystore"
+	flagBootstrap    = "bootstrap"
+	flagTls          = "tls"
+)
 
 func main() {
 	var mainCmd = &cobra.Command{

@@ -3,12 +3,13 @@ package node
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"log"
 	"time"
 
 	"github.com/driemworks/mercury-blockchain/core"
 	"github.com/driemworks/mercury-blockchain/state"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/sirupsen/logrus"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -53,15 +54,25 @@ func NewNode(name string, datadir string, miner string, ip string, port uint64, 
 	}
 }
 
-func (n *Node) Run(ctx context.Context, ip string, port int, peer string, name string) error {
+func (n *Node) Run(ctx context.Context, ip string, port int, rpcHost string, rpcPort uint64, peer string, name string) error {
 	state, err := state.NewStateFromDisk(n.datadir)
 	if err != nil {
 		return err
 	}
 	defer state.Close()
 	n.state = state
-	go n.runRPCServer("", "")
-	go n.mine(ctx)
+	go func() {
+		err := n.runRPCServer("", "", rpcHost, rpcPort)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}()
+	go func() {
+		err := n.mine(ctx)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}()
 	err = n.runLibp2pNode(ctx, ip, port, peer, name)
 	if err != nil {
 		return err
@@ -81,13 +92,11 @@ func (n *Node) mine(ctx context.Context) error {
 			go func() {
 				if len(n.pendingTXs) > 0 && !n.isMining {
 					n.isMining = true
-
 					miningCtx, stopCurrentMining = context.WithCancel(ctx)
 					err := n.minePendingTXs(miningCtx)
 					if err != nil {
-						fmt.Printf(rainbow.Red("ERROR: %s\n"), err)
+						logrus.Errorln(err)
 					}
-
 					n.isMining = false
 				}
 			}()
@@ -95,8 +104,7 @@ func (n *Node) mine(ctx context.Context) error {
 		case block, _ := <-n.newSyncedBlocks:
 			if n.isMining {
 				blockHash, _ := block.Hash()
-				fmt.Printf("\nPeer mined next Block '%s' faster :(\n", rainbow.Yellow(blockHash.Hex()))
-
+				logrus.Infoln("Peer mined next Block '%s' faster :(\n", rainbow.Yellow(blockHash.Hex()))
 				n.removeMinedPendingTXs(block)
 				stopCurrentMining()
 			}
@@ -134,13 +142,13 @@ func (n *Node) minePendingTXs(ctx context.Context) error {
 
 func (n *Node) removeMinedPendingTXs(block state.Block) {
 	if len(block.TXs) > 0 && len(n.pendingTXs) > 0 {
-		fmt.Println("Updating in-memory Pending TXs Pool:")
+		logrus.Infoln("Updating in-memory Pending TXs Pool")
 	}
 
 	for _, tx := range block.TXs {
 		txHash, _ := tx.Hash()
 		if _, exists := n.pendingTXs[txHash.Hex()]; exists {
-			fmt.Printf("\tArchiving mined TX: %s\n", rainbow.Yellow(txHash.Hex()))
+			logrus.Infof("Archiving mined TX: %s\n", rainbow.Yellow(txHash.Hex()))
 			n.archivedTXs[txHash.Hex()] = tx
 			delete(n.pendingTXs, txHash.Hex())
 		}
@@ -169,7 +177,7 @@ func (n *Node) AddPendingTX(tx state.SignedTx) error {
 			return err
 		}
 
-		fmt.Printf("Adding pending transactions: \n%s\n", &prettyTxJSON)
+		logrus.Infof("Adding pending transactions: \n%s\n", &prettyTxJSON)
 		tmpFrom := n.state.Catalog[tx.Author]
 		// if tmpFrom.Balance <= 0 {
 		// 	// for now...

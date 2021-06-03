@@ -22,6 +22,7 @@ import (
 	noise "github.com/libp2p/go-libp2p-noise"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -57,7 +58,7 @@ func makeHost(ip string, port int, insecure bool) (host.Host, error) {
 	hostAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ipfs/%s", host.ID().Pretty()))
 	addr := host.Addrs()[0]
 	fullAddr := addr.Encapsulate(hostAddr)
-	fmt.Printf("I am %s\n", fullAddr)
+	logrus.Infof("I am: %s\n", fullAddr)
 	return host, nil
 }
 
@@ -107,7 +108,8 @@ func (n *Node) runLibp2pNode(ctx context.Context, ip string, port int, bootstrap
 		addPeers(ctx, *n, bootstrapPeer, true)
 	}
 
-	log.Printf("Listening on %v (Protocols: %v)", host.Addrs(), host.Mux().Protocols())
+	logrus.Infoln("Listening on", host.Addrs())
+	logrus.Infoln("Protocols:", strings.Join(host.Mux().Protocols(), ", "))
 	host.SetStreamHandler(DiscoveryServiceTag_Announce, func(s network.Stream) {
 		// fmt.Println(DiscoveryServiceTag_Announce)
 		// read the peer's latest blockhash from the stream
@@ -191,7 +193,7 @@ func (n *Node) runLibp2pNode(ctx context.Context, ip string, port int, bootstrap
 		var tx state.SignedTx
 		err := json.Unmarshal(data.Data, &tx)
 		if err != nil {
-			fmt.Errorf("failed to unmarshal json to SignedTx: %v", err)
+			logrus.Errorln("failed to unmarshal json to SignedTx: ", err)
 		}
 		n.AddPendingTX(tx)
 	}, n.newPendingTXs)
@@ -200,14 +202,14 @@ func (n *Node) runLibp2pNode(ctx context.Context, ip string, port int, bootstrap
 		var b state.Block
 		err := json.Unmarshal(data.Data, &b)
 		if err != nil {
-			fmt.Errorf("failed to unmarshal json to Block: %v", err)
+			log.Fatalln("failed to unmarshal json to Block: ", err)
 		}
 		s, _, err := n.state.AddBlock(b)
 		if err != nil {
 			if s != nil {
 				n.state = s
 			}
-			fmt.Errorf("failed to add block: %v", err)
+			logrus.Errorln("failed to add block: ", err)
 		}
 	}, n.newMinedBlocks)
 	select {}
@@ -220,8 +222,10 @@ func streamData(ctx context.Context, host host.Host, topic protocol.ID, peerId p
 	}
 	dataJson, err := json.Marshal(data)
 	if err != nil {
-		log.Fatalln(err)
+		errBytes, _ := json.Marshal(err)
+		s.Write(errBytes)
+	} else {
+		dataJson = append(dataJson, '\n')
+		s.Write(dataJson)
 	}
-	dataJson = append(dataJson, '\n')
-	s.Write(dataJson)
 }

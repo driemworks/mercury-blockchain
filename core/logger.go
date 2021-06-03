@@ -16,13 +16,3 @@ func PrettyPrintJSON(messageJSONBytes []byte) (bytes.Buffer, error) {
 	}
 	return prettyJSON, nil
 }
-
-// WANT: standardized logging format/color coding
-// Formatting rules:
-//
-// Log levels:
-//	Info
-//  Debug
-//  Warn
-//  Error
-//  -- verbose flag?

@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/driemworks/mercury-blockchain/core"
+	"github.com/sirupsen/logrus"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/raphamorim/go-rainbow"
@@ -111,8 +112,8 @@ func (s *State) AddBlock(b Block) (*State, Hash, error) {
 	}
 
 	prettyJSON, err := core.PrettyPrintJSON(blockFsJSON)
-	fmt.Printf("Persisting new Block to disk:\n")
-	fmt.Printf("\t%s\n", &prettyJSON)
+	logrus.Infof("Persisting new Block to disk:\n")
+	logrus.Infof("\t%s\n", &prettyJSON)
 
 	_, err = s.dbFile.Write(append(blockFsJSON, '\n'))
 	if err != nil {

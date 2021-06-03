@@ -2,10 +2,10 @@ package core
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/sirupsen/logrus"
 )
 
 const PENDING_TX_TOPIC = "PENDING_TX_TOPIC"
@@ -56,7 +56,7 @@ func (cr *PubSubWrapper) ReadLoop(ctx context.Context, onMessage MessageHandler)
 	for {
 		msg, err := cr.Sub.Next(ctx)
 		if err != nil {
-			fmt.Println(err)
+			logrus.Errorln(err)
 			close(cr.Data)
 			return
 		}

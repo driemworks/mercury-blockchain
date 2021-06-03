@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/driemworks/mercury-blockchain/state"
+	"github.com/sirupsen/logrus"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/raphamorim/go-rainbow"
@@ -44,7 +45,7 @@ func Mine(ctx context.Context, pb PendingBlock) (state.Block, error) {
 	for !state.IsBlockHashValid(hash) {
 		select {
 		case <-ctx.Done():
-			fmt.Println("Mining cancelled!")
+			logrus.Infoln("Mining cancelled!")
 			return state.Block{}, fmt.Errorf(rainbow.Red("mining cancelled. %s"), ctx.Err())
 		default:
 		}
@@ -53,7 +54,7 @@ func Mine(ctx context.Context, pb PendingBlock) (state.Block, error) {
 		nonce = generateNonce()
 
 		if attempt%1000000 == 0 || attempt == 1 {
-			fmt.Printf("Mining "+rainbow.Magenta("%d")+" Pending TXs. Attempt: "+rainbow.Magenta("%d")+".\n", len(pb.txs), attempt)
+			logrus.Infoln("Mining " + rainbow.Magenta(fmt.Sprintf("%d", len(pb.txs))) + " Pending TXs. Attempt: " + rainbow.Magenta(fmt.Sprintf("%d", attempt)))
 		}
 
 		block = state.NewBlock(pb.parent, pb.time, pb.number, pb.txs, nonce, pb.miner, attempt)
@@ -65,14 +66,14 @@ func Mine(ctx context.Context, pb PendingBlock) (state.Block, error) {
 		hash = blockHash
 	}
 
-	fmt.Printf("\nMined new Block '%v':\n", info(fmt.Sprint(hash)))
-	fmt.Printf("\tHeight: '%v'\n", info(fmt.Sprint(block.Header.Number)))
-	fmt.Printf("\tNonce: '%v'\n", info(fmt.Sprint(block.Header.Nonce)))
-	fmt.Printf("\tCreated: '%v'\n", info(fmt.Sprint(block.Header.Time)))
-	fmt.Printf("\tMiner: '%v'\n", info(fmt.Sprint(block.Header.Miner)))
-	fmt.Printf("\tParent: '%v'\n\n", info(fmt.Sprint(block.Header.Parent.Hex())))
-	fmt.Printf("\tAttempt: '%v'\n", info(fmt.Sprint(attempt)))
-	fmt.Printf("\tTime: %s\n\n", info(fmt.Sprint(time.Since(start))))
+	logrus.Infof("\nMined new Block '%v':\n", info(fmt.Sprint(hash)))
+	logrus.Infof("\tHeight: '%v'\n", info(fmt.Sprint(block.Header.Number)))
+	logrus.Infof("\tNonce: '%v'\n", info(fmt.Sprint(block.Header.Nonce)))
+	logrus.Infof("\tCreated: '%v'\n", info(fmt.Sprint(block.Header.Time)))
+	logrus.Infof("\tMiner: '%v'\n", info(fmt.Sprint(block.Header.Miner)))
+	logrus.Infof("\tParent: '%v'\n\n", info(fmt.Sprint(block.Header.Parent.Hex())))
+	logrus.Infof("\tAttempt: '%v'\n", info(fmt.Sprint(attempt)))
+	logrus.Infof("\tTime: %s\n\n", info(fmt.Sprint(time.Since(start))))
 
 	return block, nil
 }
