@@ -3,7 +3,6 @@ Mercury is simple a blockchain built on top of go-libp2p. Current, Mercury is in
 
 ## TODOS
 - Replace PoW with more efficient consensus algorithm.. proof of contribution?
-- ListBlocks 
 - test coverage
 
 ## Getting Started
@@ -13,7 +12,6 @@ TODO
 
 ### Pre requisites
 - install `go`
-- install `ipfs` (recommended)
 
 ### Installation 
 - Install mercury from the source by cloning this repo and run `go install ./cli/...` from the root directory `mercury-blockchain/`.
@@ -97,7 +95,7 @@ In the current implementation this is synonymous with defining a new topic.
 
 Example 
 ```
-grpcurl -plaintext -d @ 127.0.0.1:9081 proto.NodeService/AddTransaction <<EOM
+grpcurl -plaintext -d @ 127.0.0.1:9082 proto.NodeService/AddTransaction <<EOM
 {
     "label": "hello",
     "password": "test"
@@ -114,7 +112,7 @@ In the current implementation this is synonymous with listing all defined topics
 
 Example 
 ```
-grpcurl -plaintext -d @ 127.0.0.1:9081 proto.NodeService/ListBlocks <<EOM
+grpcurl -plaintext -d @ 127.0.0.1:9082 proto.NodeService/ListBlocks <<EOM
 {
     "fromBlock": ""
 }
@@ -127,9 +125,9 @@ Allows a node to subscribe to a topic, identified by the transaction hash within
 
 Example:
 ```
-grpcurl -plaintext -d @ 127.0.0.1:9081 proto.NodeService/Subscribe <<EOM
+grpcurl -plaintext -d @ 0.0.0.0:8080 proto.NodeService/Subscribe <<EOM
 {
-    "txHash": "cac49c8e6a9a93560c444a9b568565a24fbffb7420d53ca56c3961870b90cff6"
+    "txHash": "197e33d7b4b7c987c3739689978a4a88745e3ef095b3df7878774d10b09b7e7c"
 }
 EOM
 ```
