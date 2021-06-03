@@ -1,12 +1,10 @@
 # Mercury Blockchain
-[![GoReportCard example](https://goreportcard.com/badge/github.com/driemworks/mercury-blockchain)](https://goreportcard.com/report/github.com/driemworks/mercury-blockchain)
-
-[![GPLv3 license](https://img.shields.io/badge/License-GPLv3-blue.svg)](http://perso.crans.org/besson/LICENSE.html)
+[![GoReportCard example](https://goreportcard.com/badge/github.com/driemworks/mercury-blockchain)](https://goreportcard.com/report/github.com/driemworks/mercury-blockchain) [![GPLv3 license](https://img.shields.io/badge/License-GPLv3-blue.svg)](http://perso.crans.org/besson/LICENSE.html)
 
 Mercury is an unfinished experiment without a clearly defined scope as to what 'done' means.
 The current iteration of mercury is a blockchain based p2p-chat platform. It allows nodes to define topics within transactions in the blockchain. Peers are then able to subscribe to topics as referenced by their unique transaction hash using rpc endpoints. Though there is a wallet and a token, there is currently no value assigned nor means to exchange tokens.
 
-With no specific direction in mind, intentions for Mercury is to expand to a decentralized state management platform (i.e. something along the lines of holochain)
+With no specific direction in mind, intentions for Mercury is to expand to a decentralized state management platform (i.e. something along the lines of holochain). That being said, the current implementation is *not* optimized to be a p2p messaging app (in terms of UX), even though it is.
 
 ## Getting Started
 Mercury uses [go-libp2p](https://github.com/libp2p/go-libp2p) to enable p2p communication and exposes rpc endpoints to allow communication with the the node. Security was *not* considered whatsoever in the current implementation. 
@@ -160,7 +158,7 @@ Publish to a pubsub topic which is defined within a transaction.
 grpcurl -plaintext -d @ 127.0.0.1:9081 proto.NodeService/Publish <<EOM
 {
   "txHash": "197e33d7b4b7c987c3739689978a4a88745e3ef095b3df7878774d10b09b7e7c",
-	"message": "hello world"
+  "message": "hello world"
 }
 EOM
 ```
