@@ -1,6 +1,8 @@
 # Mercury Blockchain
 [![GoReportCard example](https://goreportcard.com/badge/github.com/driemworks/mercury-blockchain)](https://goreportcard.com/report/github.com/driemworks/mercury-blockchain)
 
+[![GPLv3 license](https://img.shields.io/badge/License-GPLv3-blue.svg)](http://perso.crans.org/besson/LICENSE.html)
+
 Mercury is an unfinished experiment without a clearly defined scope as to what 'done' means.
 The current iteration of mercury is a blockchain based p2p-chat platform. It allows nodes to define topics within transactions in the blockchain. Peers are then able to subscribe to topics as referenced by their unique transaction hash using rpc endpoints. Though there is a wallet and a token, there is currently no value assigned nor means to exchange tokens.
 
@@ -51,13 +53,13 @@ This section explains how to get started using mercury.
   mercury wallet new-address --datadir=./.mercury
   >  0x27084384033F90d96c3769e1b4fCE0E5ffff720B
   # start a node using the new address as the miner
-  mercury run --datadir=./.mercury --port=8081 --rpc-port=9081 --miner=0x27084384033F90d96c3769e1b4fCE0E5ffff720B --bootstrap="/ip4/3.224.116.20/tcp/8080/p2p/QmVZMMmtvYLyUxeJjGP7LRZqEa957Z3DHZvJ1pkhDXTpXj"
+  mercury run --datadir=./.mercury --port=8081 --rpc-port=9081 --miner=0x27084384033F90d96c3769e1b4fCE0E5ffff720B --bootstrap="/ip4/172.31.78.60/tcp/8080/p2p/QmWPgXq1ZXAMkdDMSaJok9VQsBVn69bk71y3yWYefd7nSr"
   ```
 
 ### Connect to test network
 A bootstrap node is available at `/ip4/3.224.116.20/tcp/8080/p2p/QmVZMMmtvYLyUxeJjGP7LRZqEa957Z3DHZvJ1pkhDXTpXj`
 
-example: `mercury run --name=<your-name> --datadir=.mercury/ --miner=<your-address> --port=<your port> --bootstrap=/ip4/3.224.116.20/tcp/8080/p2p/QmVZMMmtvYLyUxeJjGP7LRZqEa957Z3DHZvJ1pkhDXTpXj`
+example: `mercury run --name=<your-name> --datadir=.mercury/ --miner=<your-address> --port=<your port> --bootstrap=/ip4/172.31.78.60/tcp/8080/p2p/QmWPgXq1ZXAMkdDMSaJok9VQsBVn69bk71y3yWYefd7nSr`
 
 Subscribe to the tx hash `197e33d7b4b7c987c3739689978a4a88745e3ef095b3df7878774d10b09b7e7c` and publish a message to say hello!
 
