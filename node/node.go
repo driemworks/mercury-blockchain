@@ -18,6 +18,7 @@ import (
 
 const miningIntervalSeconds = 15
 
+// TODO this is getting messy
 type Node struct {
 	datadir         string
 	ip              string
@@ -27,6 +28,7 @@ type Node struct {
 	pendingTXs      map[string]state.SignedTx
 	archivedTXs     map[string]state.SignedTx
 	newSyncedBlocks chan state.Block
+	candidateBlocks chan state.Block
 	newMinedBlocks  chan core.MessageTransport
 	newPendingTXs   chan core.MessageTransport
 	isMining        bool
@@ -34,9 +36,10 @@ type Node struct {
 	tls             bool
 	host            host.Host
 	pubsub          *pubsub.PubSub
+	stake           int
 }
 
-func NewNode(name string, datadir string, miner string, ip string, port uint64, tls bool) *Node {
+func NewNode(name string, datadir string, miner string, ip string, port uint64, tls bool, stake int) *Node {
 	minerAddress := state.NewAddress(miner)
 	return &Node{
 		name:            name,
@@ -51,6 +54,7 @@ func NewNode(name string, datadir string, miner string, ip string, port uint64, 
 		newPendingTXs:   make(chan core.MessageTransport, 10000),
 		isMining:        false,
 		tls:             tls,
+		stake:           stake, // todo this is temporary, will remove when endpoint + validations added
 	}
 }
 
@@ -78,6 +82,33 @@ func (n *Node) Run(ctx context.Context, ip string, port int, rpcHost string, rpc
 		return err
 	}
 	return nil
+}
+
+func (n *Node) consensus(ctx context.Context) error {
+	ticker := time.NewTicker(time.Second * miningIntervalSeconds)
+	for {
+		select {
+		case <-ticker.C:
+			go func() {
+				if len(n.pendingTXs) > 0 && !n.isMining {
+					n.isMining = true
+					blockCreator, err := n.electBlockCreator()
+					if err != nil {
+						logrus.Errorln(err)
+					}
+					logrus.Infoln("Selected block creator ", blockCreator)
+					// gossip selection to peers
+					err = n.notifyBlockCreator(blockCreator)
+					if err != nil {
+						logrus.Errorln(err)
+					}
+				}
+			}()
+		case <-ctx.Done():
+			ticker.Stop()
+			return nil
+		}
+	}
 }
 
 func (n *Node) mine(ctx context.Context) error {
@@ -115,8 +146,16 @@ func (n *Node) mine(ctx context.Context) error {
 	}
 }
 
+func (n *Node) notifyBlockCreator(b *common.Address) error {
+	return nil
+}
+
+func (n *Node) electBlockCreator() (*common.Address, error) {
+	return nil, nil
+}
+
 func (n *Node) minePendingTXs(ctx context.Context) error {
-	blockToMine := NewPendingBlock(
+	blockToMine := state.NewPendingBlock(
 		n.state.LatestBlockHash(),
 		n.state.NextBlockNumber(),
 		n.miner,

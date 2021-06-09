@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -47,6 +48,19 @@ type BlockHeader struct {
 type BlockFS struct {
 	Key   Hash  `json:"hash"`
 	Value Block `json:"block"`
+}
+
+// PendingBlock represents a block before it has been mined
+type PendingBlock struct {
+	Parent Hash
+	Number uint64
+	Time   uint64
+	Miner  common.Address
+	Txs    []SignedTx
+}
+
+func NewPendingBlock(parent Hash, number uint64, miner common.Address, txs []SignedTx) PendingBlock {
+	return PendingBlock{parent, number, uint64(time.Now().Unix()), miner, txs}
 }
 
 /*

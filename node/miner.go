@@ -7,32 +7,22 @@ import (
 	"time"
 
 	"github.com/driemworks/mercury-blockchain/state"
-	"github.com/sirupsen/logrus"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/raphamorim/go-rainbow"
+	"github.com/sirupsen/logrus"
 )
-
-// PendingBlock represents a block before it has been mined
-type PendingBlock struct {
-	parent state.Hash
-	number uint64
-	time   uint64
-	miner  common.Address
-	txs    []state.SignedTx
-}
-
-func NewPendingBlock(parent state.Hash, number uint64, miner common.Address, txs []state.SignedTx) PendingBlock {
-	return PendingBlock{parent, number, uint64(time.Now().Unix()), miner, txs}
-}
 
 func generateNonce() uint32 {
 	rand.Seed(time.Now().UTC().UnixNano())
 	return rand.Uint32()
 }
 
-func Mine(ctx context.Context, pb PendingBlock) (state.Block, error) {
-	if len(pb.txs) == 0 {
+func ElectBlockCreator() (*common.Address, error) {
+	return nil, nil
+}
+
+func Mine(ctx context.Context, pb state.PendingBlock) (state.Block, error) {
+	if len(pb.Txs) == 0 {
 		return state.Block{}, fmt.Errorf(rainbow.Red("block is empty - there is nothing to mine"))
 	}
 
@@ -54,10 +44,10 @@ func Mine(ctx context.Context, pb PendingBlock) (state.Block, error) {
 		nonce = generateNonce()
 
 		if attempt%1000000 == 0 || attempt == 1 {
-			logrus.Infoln("Mining " + rainbow.Magenta(fmt.Sprintf("%d", len(pb.txs))) + " Pending TXs. Attempt: " + rainbow.Magenta(fmt.Sprintf("%d", attempt)))
+			logrus.Infoln("Mining " + rainbow.Magenta(fmt.Sprintf("%d", len(pb.Txs))) + " Pending TXs. Attempt: " + rainbow.Magenta(fmt.Sprintf("%d", attempt)))
 		}
 
-		block = state.NewBlock(pb.parent, pb.time, pb.number, pb.txs, nonce, pb.miner, attempt)
+		block = state.NewBlock(pb.Parent, pb.Time, pb.Number, pb.Txs, nonce, pb.Miner, attempt)
 		blockHash, err := block.Hash()
 		if err != nil {
 			return state.Block{}, fmt.Errorf("couldn't mine block. %s", err.Error())

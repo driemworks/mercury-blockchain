@@ -34,6 +34,7 @@ type State struct {
 	dbFile               *os.File
 	datadir              string
 	hasGenesisBlock      bool
+	Validators           map[common.Address]int //map open validators to balances
 }
 
 /*
@@ -65,7 +66,18 @@ func NewStateFromDisk(datadir string) (*State, error) {
 	scanner := bufio.NewScanner(blockDbFile)
 	account2Nonce := make(map[common.Address]uint)
 	pendingAccount2Nonce := make(map[common.Address]uint)
-	state := &State{make(map[string]chan core.MessageTransport, 0), manifest, account2Nonce, pendingAccount2Nonce, make([]Tx, 0), Block{}, Hash{}, blockDbFile, datadir, true}
+	state := &State{
+		make(map[string]chan core.MessageTransport, 0),
+		manifest,
+		account2Nonce,
+		pendingAccount2Nonce,
+		make([]Tx, 0),
+		Block{},
+		Hash{},
+		blockDbFile,
+		datadir,
+		true,
+		make(map[common.Address]int)}
 	for scanner.Scan() {
 		// handle scanner error
 		if err := scanner.Err(); err != nil {
@@ -91,6 +103,7 @@ func NewStateFromDisk(datadir string) (*State, error) {
 func (s *State) AddBlock(b Block) (*State, Hash, error) {
 	pendingState := s.copy()
 	latestBlock := s.latestBlock
+	// if the block is the genesis block
 	if s.hasGenesisBlock && b.Header.Number < latestBlock.Header.Number+1 {
 		return nil, Hash{}, nil
 	}
@@ -137,9 +150,11 @@ func ApplyBlock(b Block, s *State) error {
 	}
 
 	if s.hasGenesisBlock && b.Header.Number != nextExpectedBlockNumber {
-		return fmt.Errorf("next expected block number must be '%d' not '%d'", nextExpectedBlockNumber, b.Header.Number)
+		return fmt.Errorf("next expected block number must be '%d' not '%d'",
+			nextExpectedBlockNumber, b.Header.Number)
 	} else if s.hasGenesisBlock && s.latestBlock.Header.Number > 0 && !reflect.DeepEqual(b.Header.Parent, s.latestBlockHash) {
-		return fmt.Errorf("next block parent hash must be '%x' not '%x'", s.latestBlockHash, b.Header.Parent)
+		return fmt.Errorf("next block parent hash must be '%x' not '%x'",
+			s.latestBlockHash, b.Header.Parent)
 	}
 	if !IsBlockHashValid(hash) {
 		return fmt.Errorf(rainbow.Red("Invalid block hash %x"), hash)

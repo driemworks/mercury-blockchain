@@ -30,6 +30,7 @@ func runCmd() *cobra.Command {
 			rpcHost, _ := cmd.Flags().GetString(flatRPCHost)
 			rpcPort, _ := cmd.Flags().GetUint64(flagRPCPort)
 			bootstrap, _ := cmd.Flags().GetString(flagBootstrap)
+			stake, _ := cmd.Flags().GetInt("stake")
 			// validate/fix data issues (thanks Windows)
 			if strings.Contains(bootstrap, "C:/Program Files/Git") {
 				bootstrap = strings.Split(bootstrap, "C:/Program Files/Git")[1]
@@ -43,7 +44,7 @@ func runCmd() *cobra.Command {
 			`)))
 			log.Infoln("Starting mercury")
 			log.Infoln(fmt.Sprintf("Version %s.%s.%s-beta\n", Major, Minor, Patch))
-			n := node.NewNode(name, getDataDirFromCmd(cmd), address, rpcHost, port, false)
+			n := node.NewNode(name, getDataDirFromCmd(cmd), address, rpcHost, port, false, stake)
 			err := n.Run(context.Background(), host, int(port), rpcHost, rpcPort,
 				bootstrap, name)
 			if err != nil {

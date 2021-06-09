@@ -102,7 +102,6 @@ func (n *Node) runLibp2pNode(ctx context.Context, ip string, port int, bootstrap
 	}
 	// add bootstrap nodes if provided
 	if bootstrapPeer == "" {
-		// TODO leaving as localhost for now. Should this be configurable?
 		bootstrapPeer = fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", ip, port, host.ID().Pretty())
 	} else {
 		addPeers(ctx, *n, bootstrapPeer, true)
@@ -110,72 +109,10 @@ func (n *Node) runLibp2pNode(ctx context.Context, ip string, port int, bootstrap
 
 	logrus.Infoln("Listening on", host.Addrs())
 	logrus.Infoln("Protocols:", strings.Join(host.Mux().Protocols(), ", "))
-	host.SetStreamHandler(DiscoveryServiceTag_Announce, func(s network.Stream) {
-		// fmt.Println(DiscoveryServiceTag_Announce)
-		// read the peer's latest blockhash from the stream
-		buf := bufio.NewReader(s)
-		bytes, err := buf.ReadBytes('\n')
-		// decode bytes
-		var decoded [32]byte
-		hex.Decode(bytes[:], decoded[:])
-		blocks, err := state.GetBlocksAfter(decoded, n.datadir)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		if blocks != nil {
-			streamData(ctx, host, DiscoveryServiceTag_Blocks, s.Conn().RemotePeer(), blocks)
-		}
-		if n.pendingTXs != nil {
-			streamData(ctx, host, DiscoveryServiceTag_PendingTxs, s.Conn().RemotePeer(), n.pendingTXs)
-		}
-		err = s.Close()
-		if err != nil {
-			log.Fatalln(DiscoveryServiceTag_Announce, err)
-		}
-	})
-	// sync pending txs (from bootstrap node) on startup
-	host.SetStreamHandler(DiscoveryServiceTag_PendingTxs, func(s network.Stream) {
-		// fmt.Println(DiscoveryServiceTag_PendingTxs)
-		buf := bufio.NewReader(s)
-		bytes, err := buf.ReadBytes('\n')
-		if err != nil {
-			log.Fatalln(err)
-		}
-		var txs map[string]state.SignedTx
-		err = json.Unmarshal(bytes, &txs)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		n.pendingTXs = txs
-		err = s.Close()
-		if err != nil {
-			log.Fatalln(err)
-		}
-	})
-	// sync blocks (from bootstrap) on startup
-	host.SetStreamHandler(DiscoveryServiceTag_Blocks, func(s network.Stream) {
-		// fmt.Println(DiscoveryServiceTag_Blocks)
-		buf := bufio.NewReader(s)
-		bytes, err := buf.ReadBytes('\n')
-		if err != nil {
-			log.Fatalln(err)
-		}
-		var blocks []state.Block
-		err = json.Unmarshal(bytes, &blocks)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		for _, b := range blocks {
-			_, _, err = n.state.AddBlock(b)
-			if err != nil {
-				log.Fatalln(err)
-			}
-		}
-		err = s.Close()
-		if err != nil {
-			log.Fatalln(err)
-		}
-	})
+	// listen for streams from peers
+	streamHandler_Announce(ctx, host, n)
+	streamHandler_PendingTx(ctx, host, n)
+	streamHandler_Blocks(ctx, host, n)
 
 	peerinfo, err := peer.AddrInfoFromP2pAddr(multiaddr.StringCast(bootstrapPeer))
 	tracer, err := pubsub.NewRemoteTracer(ctx, host, *peerinfo)
@@ -213,6 +150,78 @@ func (n *Node) runLibp2pNode(ctx context.Context, ip string, port int, bootstrap
 		}
 	}, n.newMinedBlocks)
 	select {}
+}
+
+func streamHandler_Announce(ctx context.Context, host host.Host, n *Node) {
+	host.SetStreamHandler(DiscoveryServiceTag_Announce, func(s network.Stream) {
+		// read the peer's latest blockhash from the stream
+		buf := bufio.NewReader(s)
+		bytes, err := buf.ReadBytes('\n')
+		// decode bytes
+		var decoded [32]byte
+		hex.Decode(bytes[:], decoded[:])
+		blocks, err := state.GetBlocksAfter(decoded, n.datadir)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if blocks != nil {
+			streamData(ctx, host, DiscoveryServiceTag_Blocks, s.Conn().RemotePeer(), blocks)
+		}
+		if n.pendingTXs != nil {
+			streamData(ctx, host, DiscoveryServiceTag_PendingTxs, s.Conn().RemotePeer(), n.pendingTXs)
+		}
+		err = s.Close()
+		if err != nil {
+			log.Fatalln(DiscoveryServiceTag_Announce, err)
+		}
+	})
+}
+
+func streamHandler_PendingTx(ctx context.Context, host host.Host, n *Node) {
+	host.SetStreamHandler(DiscoveryServiceTag_PendingTxs, func(s network.Stream) {
+		// fmt.Println(DiscoveryServiceTag_PendingTxs)
+		buf := bufio.NewReader(s)
+		bytes, err := buf.ReadBytes('\n')
+		if err != nil {
+			log.Fatalln(err)
+		}
+		var txs map[string]state.SignedTx
+		err = json.Unmarshal(bytes, &txs)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		n.pendingTXs = txs
+		err = s.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	})
+}
+
+func streamHandler_Blocks(ctx context.Context, host host.Host, n *Node) {
+	host.SetStreamHandler(DiscoveryServiceTag_Blocks, func(s network.Stream) {
+		// fmt.Println(DiscoveryServiceTag_Blocks)
+		buf := bufio.NewReader(s)
+		bytes, err := buf.ReadBytes('\n')
+		if err != nil {
+			log.Fatalln(err)
+		}
+		var blocks []state.Block
+		err = json.Unmarshal(bytes, &blocks)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		for _, b := range blocks {
+			_, _, err = n.state.AddBlock(b)
+			if err != nil {
+				log.Fatalln(err)
+			}
+		}
+		err = s.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	})
 }
 
 func streamData(ctx context.Context, host host.Host, topic protocol.ID, peerId peer.ID, data interface{}) {

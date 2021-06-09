@@ -6,6 +6,12 @@ The current iteration of mercury is a blockchain based p2p-chat platform. It all
 
 With no specific direction in mind, intentions for Mercury is to expand to a decentralized state management platform (i.e. something along the lines of holochain). That being said, the current implementation is *not* optimized to be a p2p messaging app (in terms of UX), even though it is.
 
+
+## TODOS
+- [] research/implement more efficient consensus algorithm (leaning towards BFT)
+- [] research using a sidechain to interface with eth mainnet
+- [] redesign so as to achieve a holochain-like system
+
 ## Getting Started
 Mercury uses [go-libp2p](https://github.com/libp2p/go-libp2p) to enable p2p communication and exposes rpc endpoints to allow communication with the the node. Security was *not* considered whatsoever in the current implementation. 
 
@@ -172,7 +178,6 @@ protoc --go_out=. --go_opt=paths=source_relative \
     --go-grpc_out=. --go-grpc_opt=paths=source_relative \
     proto/node.proto
 ```
-
 
 ### Issues
 - test coverage is nil
