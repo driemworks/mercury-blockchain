@@ -8,12 +8,15 @@ With no specific direction in mind, intentions for Mercury is to expand to a dec
 
 
 ## TODOS
-- [] research/implement more efficient consensus algorithm (leaning towards BFT)
-- [] research using a sidechain to interface with eth mainnet
-- [] redesign so as to achieve a holochain-like system
+- [] implement proof of stake consensus (in progress)
+- [] use merkle tree structure for representing txs (+ merkle proofs) https://web3.coach/golang-blockchain-filesystem-and-merkle-trees
 
 ## Getting Started
 Mercury uses [go-libp2p](https://github.com/libp2p/go-libp2p) to enable p2p communication and exposes rpc endpoints to allow communication with the the node. Security was *not* considered whatsoever in the current implementation. 
+
+### Why?
+The big question: so what's the point? Why not just use Ethereum or an already established network?
+Building our own blockchain, with it's own consensus, peer sync, and the like, allows us total control over how nodes are rewarded and incentivized. This exists as a learning experience, so consider this more of a test-bed for experimental designs that could drastically change until I figure what exactly I want this thing to do.
 
 ### Pre requisites
 - install `go`

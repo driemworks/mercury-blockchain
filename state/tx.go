@@ -14,13 +14,12 @@ func NewAddress(value string) common.Address {
 	return common.HexToAddress(value)
 }
 
+// the Tx struct imoplements the Content interface (merkle_tree.go)
 type Tx struct {
 	Author common.Address `json:"author"`
 	Topic  string         `json:"topic"`
-	// GenesisState []byte
-	// ValidationRules ???
-	Nonce uint   `json:"nonce"`
-	Time  uint64 `json:"time"`
+	Nonce  uint           `json:"nonce"`
+	Time   uint64         `json:"time"`
 }
 
 type SignedTx struct {
@@ -65,4 +64,25 @@ func (t SignedTx) IsAuthentic() (bool, error) {
 	recoveredAccount := common.BytesToAddress(recoveredPubKeyBytesHash[12:])
 
 	return recoveredAccount.Hex() == t.Author.Hex(), nil
+}
+
+/*
+	implement the Content interface (merkle_tree.go)
+*/
+func (t Tx) CalculateHash() ([]byte, error) {
+	h := sha256.New()
+	txBytes, err := json.Marshal(t)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := h.Write(txBytes); err != nil {
+		return nil, err
+	}
+
+	return h.Sum(nil), nil
+}
+
+//Equals tests for equality of two Contents
+func (t Tx) Equals(other Tx) (bool, error) {
+	return t.Author == other.Author && t.Nonce == other.Nonce && t.Time == other.Time, nil
 }

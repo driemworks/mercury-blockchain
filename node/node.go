@@ -90,8 +90,8 @@ func (n *Node) consensus(ctx context.Context) error {
 		select {
 		case <-ticker.C:
 			go func() {
-				if len(n.pendingTXs) > 0 && !n.isMining {
-					n.isMining = true
+				if n.stake > 0 && len(n.pendingTXs) > 0 && !n.isMining {
+					n.isMining = true // still needed?
 					blockCreator, err := n.electBlockCreator()
 					if err != nil {
 						logrus.Errorln(err)
